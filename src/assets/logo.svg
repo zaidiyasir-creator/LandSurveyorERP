@@ -1,0 +1,56 @@
+<svg
+  width="100%"
+  height="100%"
+  viewBox="0 0 100 100"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <defs>
+    <!-- Rich Gold Gradient -->
+    <linearGradient id="hm-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#D4AF37" />
+      <stop offset="30%" stopColor="#F3E5AB" />
+      <stop offset="70%" stopColor="#AA7C11" />
+      <stop offset="100%" stopColor="#8B6508" />
+    </linearGradient>
+    
+    <!-- Metallic Silver-Gray Gradient -->
+    <linearGradient id="hm-gray" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#8A8D8F" />
+      <stop offset="50%" stopColor="#D5DBDB" />
+      <stop offset="100%" stopColor="#566573" />
+    </linearGradient>
+  </defs>
+
+  <!-- Orbit Arc - Upper/Right Gold sweep -->
+  <path
+    d="M 50 10 C 74.5 10 90 28 87 53 C 84 75 66 90 48 88 C 42 87.3 35 84 35 84 C 35 84 46.5 81 50.5 77 C 64.5 63 76 43 65 22 C 59 11 50 10 50 10 Z"
+    fill="url(#hm-gold)"
+  />
+
+  <!-- Orbit Arc - Lower/Left Gray sweep -->
+  <path
+    d="M 50 90 C 25.5 90 10 72 13 47 C 16 25 34 10 52 12 C 58 12.7 65 16 65 16 C 65 16 53.5 19 49.5 23 C 35.5 37 24 57 35 78 C 41 89 50 90 50 90 Z"
+    fill="url(#hm-gray)"
+  />
+
+  <!-- The 'H' letter (Gold) -->
+  <path
+    d="M 27 34 C 27 32.5 28 32 29.5 32 L 33.5 32 C 35 32 35.5 32.5 35.5 34 L 35.5 66 C 35.5 67.5 35 68 33.5 68 L 29.5 68 C 28 68 27 67.5 27 66 Z"
+    fill="url(#hm-gold)"
+  />
+  <path
+    d="M 44.5 34 C 44.5 32.5 45 32 46.5 32 L 50.5 32 C 52 32 53 32.5 53 34 L 53 66 C 53 67.5 52 68 50.5 68 L 46.5 68 C 45 68 44.5 67.5 44.5 66 Z"
+    fill="url(#hm-gold)"
+  />
+  <path
+    d="M 32 47 C 35 44.5 40.5 43.5 43 48 C 43.5 49 45.5 49 46 48 C 48.5 43.5 54 44.5 57 47 L 57 53 C 54 50.5 48.5 49.5 46 54 C 45.5 55 43.5 55 43 54 C 40.5 49.5 35 50.5 32 53 Z"
+    fill="url(#hm-gold)"
+  />
+
+  <!-- The 'M' letter (Metallic Gray) -->
+  <path
+    d="M 56 66 L 56 34 C 56 32.5 57 32 58.5 32 L 61.5 32 C 63 32 63.5 32.5 64 34 L 69 50.5 L 74 34 C 74.5 32.5 75 32 76.5 32 L 79.5 32 C 81 32 82 32.5 82 34 L 82 66 C 82 67.5 81 68 79.5 68 L 76.5 68 C 75 68 74.5 67.5 74.5 66 L 74.5 48 L 70.5 61.5 C 70 63 68 63 67.5 61.5 L 63.5 48 L 63.5 66 C 63.5 67.5 63 68 61.5 68 L 58.5 68 C 57 68 56 67.5 56 66 Z"
+    fill="url(#hm-gray)"
+  />
+</svg>

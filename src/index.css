@@ -1,0 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-brand-bg: #F8F7F4;
+  --color-brand-ink: #18181A;
+  --color-brand-accent: #0CA678;
+  --color-brand-sidebar-bg: #111113;
+  --color-brand-sidebar-ink: #F2EFEB;
+}
