@@ -526,8 +526,8 @@ async function startServer() {
 
   app.post('/api/quotations', (req, res) => {
     const amount = Number(req.body.amount || 0);
-    const sst_amount = amount * 0.08;
-    const total = amount * 1.08;
+    const sst_amount = req.body.sst_amount !== undefined ? Number(req.body.sst_amount) : amount * 0.08;
+    const total = req.body.total !== undefined ? Number(req.body.total) : amount + sst_amount;
 
     const newQuote: Quotation = {
       id: `quote-${Date.now()}`,
@@ -546,8 +546,8 @@ async function startServer() {
     const index = quotations.findIndex(q => q.id === id);
     if (index !== -1) {
       const amount = Number(req.body.amount ?? quotations[index].amount);
-      const sst_amount = amount * 0.08;
-      const total = amount * 1.08;
+      const sst_amount = req.body.sst_amount !== undefined ? Number(req.body.sst_amount) : amount * 0.08;
+      const total = req.body.total !== undefined ? Number(req.body.total) : amount + sst_amount;
 
       quotations[index] = {
         ...quotations[index],
@@ -566,6 +566,84 @@ async function startServer() {
     const { id } = req.params;
     quotations = quotations.filter(q => q.id !== id);
     res.json({ success: true });
+  });
+
+  // ---------------------------------------------------------
+  // NEXTCLOUD WEBDAV UPLOAD PROXY API
+  // ---------------------------------------------------------
+  app.post('/api/nextcloud/upload', async (req, res) => {
+    try {
+      const { nextcloudUrl, username, password, folder, filename, content } = req.body;
+
+      if (!nextcloudUrl || !username || !password || !filename || !content) {
+        return res.status(400).json({ error: 'Missing required parameters: nextcloudUrl, username, password, filename, content are mandatory.' });
+      }
+
+      // Clean and normalize Nextcloud URL
+      let baseUrl = nextcloudUrl.trim();
+      if (baseUrl.endsWith('/')) {
+        baseUrl = baseUrl.slice(0, -1);
+      }
+
+      // Nextcloud WebDAV endpoint format:
+      // {baseUrl}/remote.php/dav/files/{username}/{folder}/{filename}
+      let folderPath = (folder || '').trim();
+      // Remove leading and trailing slashes from folder
+      folderPath = folderPath.replace(/^\/+|\/+$/g, '');
+
+      const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+
+      // Ensure directory structure exists by running MKCOL (Make Collection) on each subfolder
+      const segments = folderPath ? folderPath.split('/') : [];
+      let currentPath = '';
+
+      for (const segment of segments) {
+        if (!segment) continue;
+        currentPath += '/' + segment;
+        const mkcolUrl = `${baseUrl}/remote.php/dav/files/${username}${currentPath}`;
+        
+        try {
+          await fetch(mkcolUrl, {
+            method: 'MKCOL',
+            headers: {
+              'Authorization': authHeader
+            }
+          });
+        } catch (err) {
+          // Ignore folder creation errors if it already exists
+        }
+      }
+
+      // Upload the file using PUT
+      const fileUrl = `${baseUrl}/remote.php/dav/files/${username}${currentPath ? currentPath : ''}/${filename}`;
+      
+      const putResponse = await fetch(fileUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'text/markdown; charset=utf-8'
+        },
+        body: content
+      });
+
+      if (putResponse.ok || putResponse.status === 201 || putResponse.status === 204) {
+        res.json({ 
+          success: true, 
+          message: 'File uploaded successfully to Nextcloud', 
+          path: `${currentPath}/${filename}`,
+          url: fileUrl 
+        });
+      } else {
+        const text = await putResponse.text();
+        res.status(putResponse.status).json({ 
+          error: `Nextcloud returned status ${putResponse.status}`, 
+          details: text 
+        });
+      }
+    } catch (error: any) {
+      console.error('Nextcloud upload error:', error);
+      res.status(500).json({ error: 'Failed to upload to Nextcloud', details: error.message });
+    }
   });
 
   // ---------------------------------------------------------

@@ -98,6 +98,7 @@ export interface Quotation {
   total: number;
   proposal_status: 'Draft' | 'Sent' | 'Accepted' | 'Rejected';
   created_at: string;
+  meta?: any;
 }
 
 export interface LicensedSurveyor {

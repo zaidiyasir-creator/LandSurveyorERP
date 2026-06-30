@@ -1967,28 +1967,24 @@ export default function App() {
               <div className="space-y-6 animate-fadeIn text-slate-800">
                   
                   {/* 1. DASHBOARD LAYOUT CUSTOMIZER CONTROL BAR */}
-                  <div id="dashboard-customizer-toolbar" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 font-sans">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-teal-50 text-teal-700 rounded-lg shrink-0">
-                        <Move className="w-5 h-5 animate-pulse" />
-                      </div>
-                      <div>
-                        <h3 className="font-extrabold text-[#18181A] text-sm">Interactive Dashboard Workspace</h3>
-                        <p className="text-[11px] text-slate-500">
-                          {isDashboardEditable ? (
-                            isCustomizing 
+                  {isDashboardEditable && (
+                    <div id="dashboard-customizer-toolbar" className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 font-sans">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-teal-50 text-teal-700 rounded-lg shrink-0">
+                          <Move className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <h3 className="font-extrabold text-[#18181A] text-sm">Interactive Dashboard Workspace</h3>
+                          <p className="text-[11px] text-slate-500">
+                            {isCustomizing 
                               ? "🛠️ Customizer Mode: Drag panels to reorder, set card widths (1/3, 2/3, 3/3), or hide modules." 
-                              : "Drag, scale, and adjust your HMGeomatics operational panels directly on this workspace."
-                          ) : (
-                            "View and monitor HMGeomatics operational status, revenue pipelines, and equipment schedules."
-                          )}
-                        </p>
+                              : "Drag, scale, and adjust your HMGeomatics operational panels directly on this workspace."}
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-                      {isDashboardEditable ? (
-                        isCustomizing ? (
+                      <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+                        {isCustomizing ? (
                           <>
                             <button
                               id="btn-reset-widgets"
@@ -2019,15 +2015,10 @@ export default function App() {
                             <Settings className="w-3.5 h-3.5" />
                             <span>Customize Layout</span>
                           </button>
-                        )
-                      ) : (
-                        <span className="inline-flex items-center space-x-1 px-3 py-1.5 bg-slate-100 text-slate-500 border border-slate-200 rounded-lg text-xs font-semibold select-none">
-                          <Lock className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Layout Locked (Management Only)</span>
-                        </span>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Hidden Widgets Quick Restore Row (Visible only during customization) */}
                   {isCustomizing && dashboardWidgets.some(w => !w.visible) && (

@@ -45,6 +45,133 @@ export default function QuotationsBoard({
   const [previewDocType, setPreviewDocType] = useState<'Quotation' | 'Proposal'>('Quotation');
   const [previewLang, setPreviewLang] = useState<'BM' | 'EN'>('BM');
 
+  // Nextcloud state integration
+  const [showNextcloudPanel, setShowNextcloudPanel] = useState(false);
+  const [nextcloudUrl, setNextcloudUrl] = useState('https://demo.nextcloud.com');
+  const [nextcloudUser, setNextcloudUser] = useState('HMGeomatics-Admin');
+  const [nextcloudPass, setNextcloudPass] = useState('hmg-app-token-2026');
+  const [nextcloudFolder, setNextcloudFolder] = useState('HMGeomatics/Quotations');
+  const [nextcloudFormat, setNextcloudFormat] = useState<'MD' | 'JSON'>('MD');
+  const [isUploadingNextcloud, setIsUploadingNextcloud] = useState(false);
+
+  const generateQuoteMarkdown = (quote: Quotation) => {
+    const client = clients.find(c => c.id === quote.client_id);
+    const surveyor = surveyors.find(s => s.id === (quote as any).meta?.surveyorId);
+    
+    const formattedAmount = quote.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const formattedSst = quote.sst_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const formattedTotal = quote.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const dateStr = new Date(quote.created_at).toLocaleDateString();
+    
+    // Fee Items
+    const feeItems = (quote as any).meta?.feeItems || [];
+    let itemsTable = '';
+    if (feeItems.length > 0) {
+      itemsTable = feeItems.map((item: any, idx: number) => 
+        `| ${idx + 1} | ${item.label} | ${item.desc || '-'} | RM ${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} |`
+      ).join('\n');
+    } else {
+      itemsTable = `| 1 | Bayaran standard sebut harga | Anggaran Yuran Rasmi LJT | RM ${formattedAmount} |`;
+    }
+
+    return `# HMGeomatics Sdn Bhd
+**LESEN JURU_UKUR TANAH NEGERI SEMBILAN**
+**NO. PENDAFTARAN:** LJT/NS/2026/0421
+Seremban, Negeri Sembilan, Malaysia
+No Telefon: +606-7648321 | Emel: office@hmgeomatics.com
+
+---
+
+## DOKUMEN SEBUT HARGA (QUOTATION)
+**NO RUJUKAN:** HMG-QT-2026-${quote.id.split('-')[1]?.substring(0, 4) || '0142'}
+**TARIKH:** ${dateStr}
+**TEMPOH SAH:** 30 Hari
+
+### DISEDIAKAN KEPADA:
+*   **Klien:** ${client?.nama || 'Klien Rasmi'}
+*   **Alamat:** ${client?.alamat || 'Alamat Klien'}
+*   **Mukim:** ${client?.mukim || 'Mukim Rasah'}
+
+### DISEDIAKAN OLEH:
+*   **Jurukur Berlesen:** ${surveyor?.nama || 'Sr Haji Ahmad Rafie'}
+*   **No. Lesen LLS:** ${surveyor?.license_number || 'LLS/NS/2026/0421'}
+*   **Syarikat:** HMGeomatics Sdn Bhd
+
+---
+
+### SKOP BEKERJA / SEBUT HARGA PROJEK
+**Subjek:** ${quote.subject}
+
+### PECAHAN ANGGARAN YURAN UKUR LJT
+
+| No | Deskripsi Perkhidmatan Ukur | Perincian | Jumlah (RM) |
+|:---|:----------------------------|:----------|:------------|
+${itemsTable}
+
+---
+
+### RINGKASAN BAYARAN:
+*   **YURAN BERSIH (SUBTOTAL):** RM ${formattedAmount}
+*   **CUKAI PERKHIDMATAN SST MALAYSIA (6%):** RM ${formattedSst}
+*   **JUMLAH BESAR SEBUT HARGA:** **RM ${formattedTotal}**
+
+---
+
+### TERMA DAN SYARAT PEMBAYARAN LJT:
+1. Deposit 50% wajib didepositkan sejurus selepas penerimaan sebut harga sebelum kerja lapangan bermula.
+2. Bayaran baki 50% hendaklah dilunaskan dalam tempoh 14 hari selepas pelan akui PA disiapkan atau diserahkan.
+3. Semua kadar dikawal selia di bawah Akta Jurukur Tanah Berlesen 1958.
+
+*Dokumen ini dijana secara digital dan disimpan secara rasmi pada Nextcloud Cloud Workspace.*
+`;
+  };
+
+  const handleSaveToNextcloud = async () => {
+    if (!selectedQuote) return;
+    
+    setIsUploadingNextcloud(true);
+    try {
+      const fileExt = nextcloudFormat === 'MD' ? 'md' : 'json';
+      const refNo = `HMG-QT-2026-${selectedQuote.id.split('-')[1]?.substring(0, 4) || '0142'}`;
+      const filename = `${refNo}.${fileExt}`;
+      
+      let fileContent = '';
+      if (nextcloudFormat === 'MD') {
+        fileContent = generateQuoteMarkdown(selectedQuote);
+      } else {
+        fileContent = JSON.stringify(selectedQuote, null, 2);
+      }
+      
+      const response = await fetch('/api/nextcloud/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          nextcloudUrl,
+          username: nextcloudUser,
+          password: nextcloudPass,
+          folder: nextcloudFolder,
+          filename,
+          content: fileContent
+        })
+      });
+      
+      const data = await response.json();
+      if (response.ok && data.success) {
+        notify('success', `Berjaya menyimpan ke Nextcloud! Fail disimpan di: ${data.path}`);
+        setShowNextcloudPanel(false);
+      } else {
+        notify('error', `Gagal menyimpan ke Nextcloud: ${data.error || 'Masalah tidak diketahui'}`);
+        console.error('Error detail:', data.details);
+      }
+    } catch (err: any) {
+      notify('error', `Ralat sistem: ${err.message}`);
+    } finally {
+      setIsUploadingNextcloud(false);
+    }
+  };
+
   const isIframe = () => {
     try {
       return window.self !== window.top;
@@ -168,6 +295,19 @@ export default function QuotationsBoard({
   const [rLinenA1, setRLinenA1] = useState(0);
   const [rLinenA2, setRLinenA2] = useState(0);
   const [rCopies, setRCopies] = useState(0);
+
+  // Cart items for multi-item combinations
+  interface CartItem {
+    id: string;
+    label: string;
+    amount: number;
+    description?: string;
+    details?: any;
+  }
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [customLabel, setCustomLabel] = useState('');
+  const [customAmount, setCustomAmount] = useState('');
+  const [customDesc, setCustomDesc] = useState('');
 
   // Calculate live breakdown according to LJT Schedule Rules using selected Rate Sheet
   const calc = () => {
@@ -348,6 +488,90 @@ export default function QuotationsBoard({
 
   const { items: feeItems, subtotal, sst, total } = calc();
 
+  // Cart operations
+  const handleAddToCart = () => {
+    const currentCalc = calc();
+    if (currentCalc.subtotal <= 0) {
+      notify('error', 'Jumlah yuran semasa ialah RM 0.00. Sila masukkan nilai sebelum menambah.');
+      return;
+    }
+
+    let itemLabel = `Jadual ${table}: `;
+    let itemDesc = '';
+    if (table === 'I') {
+      itemLabel += `Ukur Kadaster Bangunan (${t1Cat})`;
+      itemDesc = `${t1Lots} Lot, Keluasan ${t1Area} sm, ${t1BatuBaru} Batu Baru`;
+    } else if (table === 'II') {
+      itemLabel += `Ukur Strata (${t2Cat})`;
+      itemDesc = `${t2Blocks} Blok, ${t2Units} Unit, Harta Bersama ${t2CommonArea} sm`;
+    } else if (table === 'III') {
+      itemLabel += `Ukur Pertanian`;
+      itemDesc = `${t3Lots} Lot, Keluasan ${t3AreaHa} Ha, ${t3BatuBaru} Batu Baru`;
+    } else if (table === 'IV') {
+      itemLabel += `Ukur Perlombongan`;
+      itemDesc = `${t4AreaHa} Ha`;
+    } else if (table === 'V') {
+      itemLabel += `Terowong bawah tanah`;
+      itemDesc = `Panjang ${t5Length} meter`;
+    } else if (table === 'VI') {
+      itemLabel += `Amalgamasi`;
+      itemDesc = `${t6Lots} Lot, Keluasan ${t6Area} sm`;
+    } else if (table === 'VII') {
+      itemLabel += `Kerja Am LJT (${t7Method === 'Hourly' ? `${t7Hours} Jam` : `${t7AreaHa} Ha`})`;
+      itemDesc = t7Method === 'Hourly' ? 'Kadar Jam Kerja Am LJT' : 'Kadar Keluasan Khas LJT';
+    }
+
+    const newItem: CartItem = {
+      id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      label: itemLabel,
+      amount: currentCalc.subtotal,
+      description: itemDesc || 'Pengiraan Kadar Ukur LJT',
+      details: {
+        table,
+        feeItems: currentCalc.items,
+        subtotal: currentCalc.subtotal,
+        sst: currentCalc.sst,
+        total: currentCalc.total
+      }
+    };
+
+    setCartItems(prev => [...prev, newItem]);
+    notify('success', `Berjaya menambah "${itemLabel}" ke senarai sebut harga.`);
+  };
+
+  const handleAddCustomLineItem = () => {
+    if (!customLabel.trim()) {
+      notify('error', 'Sila masukkan nama item custom.');
+      return;
+    }
+    const amt = parseFloat(customAmount);
+    if (isNaN(amt) || amt <= 0) {
+      notify('error', 'Sila masukkan amaun yang sah (> RM 0).');
+      return;
+    }
+
+    const newItem: CartItem = {
+      id: `cart-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      label: customLabel.trim(),
+      amount: amt,
+      description: customDesc.trim() || 'Custom Line Item',
+      details: {
+        isCustom: true
+      }
+    };
+
+    setCartItems(prev => [...prev, newItem]);
+    setCustomLabel('');
+    setCustomAmount('');
+    setCustomDesc('');
+    notify('success', 'Item custom berjaya ditambah ke sebut harga.');
+  };
+
+  // Cart Calculations
+  const cartSubtotal = cartItems.reduce((acc, item) => acc + item.amount, 0);
+  const cartSst = cartSubtotal * 0.06;
+  const cartTotal = cartSubtotal + cartSst;
+
   // Save quotation via full-stack endpoint
   const handleSaveQuotation = async () => {
     if (!subject.trim()) {
@@ -358,20 +582,30 @@ export default function QuotationsBoard({
       notify('error', 'Sila pilih klien.');
       return;
     }
+    if (cartItems.length === 0) {
+      notify('error', 'Sila tambah sekurang-kurangnya satu line item atau jadual ke dalam cart sebelum menyimpan.');
+      return;
+    }
+
+    const finalFeeItems = cartItems.map(item => ({
+      label: item.label,
+      amount: item.amount,
+      desc: item.description
+    }));
 
     const payload = {
       client_id: clientId,
       subject,
-      amount: subtotal,
-      sst_amount: sst,
-      total,
+      amount: cartSubtotal,
+      sst_amount: cartSst,
+      total: cartTotal,
       proposal_status: 'Draft' as const,
       // Metadata to recreate/view details
       meta: {
-        table,
+        cartItems,
+        feeItems: finalFeeItems,
         surveyorId,
         timelineWeeks,
-        feeItems,
         rateSheetId: selectedRateSheetId,
         rateSheetName: activeRateSheet.name
       }
@@ -388,6 +622,7 @@ export default function QuotationsBoard({
         setQuotations(prev => [newQuote, ...prev]);
         notify('success', 'Sebut Harga LJT berjaya dijana dan disimpan.');
         setIsCreating(false);
+        setCartItems([]); // Reset the cart after saving successfully
       } else {
         notify('error', 'Gagal menyimpan sebut harga ke pelayan.');
       }
@@ -1007,21 +1242,89 @@ export default function QuotationsBoard({
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center space-x-3 pt-4 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={handleSaveQuotation}
-                className="flex-1 bg-[#18181A] hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider py-3 rounded-lg shadow-xs transition"
-              >
-                Simpan & Daftar Rekod
-              </button>
+            {/* ADD TO CART ACTION */}
+            <div className="bg-[#f0fdf4] border border-emerald-200 rounded-xl p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-800 flex items-center space-x-1">
+                    <span>🛒 Tindakan Sebut Harga</span>
+                  </h4>
+                  <p className="text-[10px] text-emerald-600 mt-0.5">
+                    Tambah hasil kiraan yuran Jadual {table} (serta reimbursements) di atas sebagai line item sebut harga.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-lg shadow-sm transition flex items-center justify-center space-x-1.5 cursor-pointer shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Jadual {table} ke Cart</span>
+                </button>
+              </div>
+            </div>
+
+            {/* CUSTOM LINE ITEM BUILDER */}
+            <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-white shadow-xs">
+              <div className="border-b border-slate-100 pb-2">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-800">➕ Tambah Line Item Khas (Custom Fee)</h4>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Masukkan butiran yuran, perkhidmatan ukur khas, atau caj tambahan lain secara manual.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+                <div className="sm:col-span-5 space-y-1">
+                  <label className="text-[10px] text-slate-500 font-bold uppercase">Nama Item</label>
+                  <input 
+                    type="text" 
+                    placeholder="cth: Kerja-kerja Ukuran Tambahan" 
+                    value={customLabel} 
+                    onChange={e => setCustomLabel(e.target.value)} 
+                    className="w-full border border-slate-200 p-2 rounded-lg bg-white focus:border-slate-400 outline-none" 
+                  />
+                </div>
+                <div className="sm:col-span-3 space-y-1">
+                  <label className="text-[10px] text-slate-500 font-bold uppercase">Amaun (RM)</label>
+                  <input 
+                    type="number" 
+                    placeholder="cth: 1500" 
+                    value={customAmount} 
+                    onChange={e => setCustomAmount(e.target.value)} 
+                    className="w-full border border-slate-200 p-2 rounded-lg bg-white focus:border-slate-400 outline-none" 
+                  />
+                </div>
+                <div className="sm:col-span-4 space-y-1">
+                  <label className="text-[10px] text-slate-500 font-bold uppercase">Deskripsi / Catatan</label>
+                  <input 
+                    type="text" 
+                    placeholder="cth: Pelan khas..." 
+                    value={customDesc} 
+                    onChange={e => setCustomDesc(e.target.value)} 
+                    className="w-full border border-slate-200 p-2 rounded-lg bg-white focus:border-slate-400 outline-none" 
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={handleAddCustomLineItem}
+                  className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold uppercase tracking-wider py-2 px-4 rounded-lg shadow-sm transition flex items-center space-x-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Tambah Item Khas</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Cancel Bottom Action */}
+            <div className="flex justify-start pt-2">
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}
-                className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition"
+                className="text-slate-500 hover:text-slate-700 text-xs font-bold flex items-center space-x-1 cursor-pointer transition"
               >
-                Batal
+                <X className="w-4 h-4" />
+                <span>Batal & Kembali ke Senarai Sebut Harga</span>
               </button>
             </div>
 
@@ -1030,52 +1333,142 @@ export default function QuotationsBoard({
           {/* Real-time Invoice & Document Preview Sidebar */}
           <div className="lg:col-span-5 space-y-6">
             
-            {/* Live Fee breakdown */}
+            {/* 🛒 ACTIVE QUOTATION CART / COMBINED LINE ITEMS */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4 font-sans">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2">
+                  <ClipboardList className="w-5 h-5 text-teal-600 animate-pulse" />
+                  <h4 className="font-extrabold text-[#18181A] text-sm uppercase tracking-tight">Line Items Sebut Harga ({cartItems.length})</h4>
+                </div>
+                {cartItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Adakah anda pasti mahu mengosongkan semua line item?')) {
+                        setCartItems([]);
+                      }
+                    }}
+                    className="text-[10px] text-red-500 hover:text-red-700 font-bold uppercase transition"
+                  >
+                    Kosongkan Semua
+                  </button>
+                )}
+              </div>
+
+              {cartItems.length === 0 ? (
+                <div className="py-8 text-center space-y-2.5">
+                  <div className="text-3xl text-slate-300">🛒</div>
+                  <p className="text-xs text-slate-400 font-medium max-w-[240px] mx-auto leading-relaxed">
+                    Cart kosong. Gunakan kalkulator di sebelah kiri untuk menambah Jadual LJT, atau tambah line item khas secara manual.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-[250px] overflow-y-auto pr-1">
+                  {cartItems.map((item) => (
+                    <div key={item.id} className="flex justify-between items-start bg-slate-50 border border-slate-200 rounded-xl p-3 relative hover:bg-slate-100/50 transition">
+                      <div className="space-y-0.5 max-w-[85%]">
+                        <h5 className="font-bold text-[11px] text-slate-800 leading-tight">{item.label}</h5>
+                        {item.description && <p className="text-[10px] text-slate-400 leading-snug">{item.description}</p>}
+                        <span className="inline-block text-[10px] font-mono text-teal-700 font-bold mt-1">
+                          RM {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCartItems(prev => prev.filter(c => c.id !== item.id))}
+                        className="text-slate-400 hover:text-red-500 p-1 rounded-md transition shrink-0 self-center"
+                        title="Padam Line Item"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Cart Calculations */}
+              {cartItems.length > 0 && (
+                <div className="border-t border-slate-100 pt-4 space-y-2 text-xs text-slate-600 font-sans">
+                  <div className="flex justify-between font-semibold">
+                    <span>JUMLAH BERSIH (SUBTOTAL)</span>
+                    <span className="font-mono text-[#18181A] font-bold">
+                      RM {cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>SST MALAYSIA (6%)</span>
+                    <span className="font-mono">
+                      RM {cartSst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm font-black text-[#18181A] pt-2 border-t border-slate-100">
+                    <span>JUMLAH BESAR</span>
+                    <span className="font-mono text-emerald-600 text-sm">
+                      RM {cartTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {/* Save button */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveQuotation}
+                      className="w-full bg-[#18181A] hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider py-3 rounded-lg shadow-sm transition flex items-center justify-center space-x-2 cursor-pointer"
+                    >
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span>Sahkan & Daftar Sebut Harga</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Live Fee breakdown of currently editing table */}
             <div className="bg-[#18181A] text-white p-6 rounded-2xl space-y-6 shadow-md relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-5">
                 <Calculator className="w-24 h-24" />
               </div>
               <div className="border-b border-white/10 pb-3">
-                <span className="text-[9px] font-mono uppercase tracking-widest text-slate-400 font-bold block">LIVE FEE CALCULATOR</span>
-                <h4 className="font-extrabold text-white text-sm uppercase tracking-tight">Anggaran Yuran Rasmi LJT</h4>
+                <span className="text-[9px] font-mono uppercase tracking-widest text-slate-400 font-bold block">LIVE FEE CALCULATOR PREVIEW</span>
+                <h4 className="font-extrabold text-white text-xs uppercase tracking-tight">Kiraan Semasa Jadual {table}</h4>
               </div>
-
-              <div className="space-y-3 text-xs max-h-[300px] overflow-y-auto pr-1">
+ 
+              <div className="space-y-3 text-xs max-h-[180px] overflow-y-auto pr-1">
                 {feeItems.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-start border-b border-white/5 pb-2 last:border-0 last:pb-0">
                     <div className="space-y-0.5 max-w-[70%]">
                       <p className="font-bold text-slate-200">{item.label}</p>
                       {item.desc && <p className="text-[9px] text-slate-400 font-medium">{item.desc}</p>}
                     </div>
-                    <span className="font-mono text-slate-100 font-bold">
+                    <span className="font-mono text-slate-100 font-bold shrink-0">
                       RM {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 ))}
               </div>
-
+ 
               <div className="border-t border-white/10 pt-4 space-y-2">
                 <div className="flex justify-between text-xs text-slate-300 font-bold">
-                  <span>JUMLAH BERSIH (SUBTOTAL)</span>
+                  <span>SUBTOTAL JADUAL {table}</span>
                   <span className="font-mono">
                     RM {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between text-xs text-slate-400">
-                  <span>SST MALAYSIA (6%)</span>
+                  <span>SST (6%)</span>
                   <span className="font-mono">
                     RM {sst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
-                <div className="flex justify-between text-base text-white font-black pt-2 border-t border-white/5">
-                  <span>JUMLAH BESAR</span>
+                <div className="flex justify-between text-sm text-white font-black pt-2 border-t border-white/5">
+                  <span>TOTAL JADUAL {table}</span>
                   <span className="font-mono text-emerald-400">
                     RM {total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
             </div>
-
+ 
             {/* Documentation Quick Tips block */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
               <div className="flex items-center space-x-2 text-slate-700">
@@ -1153,8 +1546,138 @@ export default function QuotationsBoard({
                 <Printer className="w-3.5 h-3.5" />
                 <span>Cetak / PDF</span>
               </button>
+
+              <button
+                onClick={() => setShowNextcloudPanel(!showNextcloudPanel)}
+                className={`text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg shadow transition flex items-center space-x-1.5 cursor-pointer ${showNextcloudPanel ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'}`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Simpan ke Nextcloud</span>
+              </button>
             </div>
           </div>
+
+          {/* Nextcloud Configuration Panel */}
+          {showNextcloudPanel && (
+            <div className="bg-slate-50 border border-teal-200 p-5 rounded-2xl max-w-4xl mx-auto space-y-4 animate-fadeIn font-sans my-4">
+              <div className="flex items-center justify-between border-b border-teal-100 pb-2">
+                <div className="flex items-center space-x-2">
+                  <div className="p-1.5 bg-teal-50 text-teal-700 rounded-lg shrink-0">
+                    <Download className="w-4 h-4 animate-bounce" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-[#18181A]">Integrasi Nextcloud Cloud Workspace</h4>
+                    <p className="text-[10px] text-slate-500 font-medium">Sambungkan sebut harga ini ke storan Nextcloud syarikat anda secara langsung.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowNextcloudPanel(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-md"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nextcloud URL Pelayan</label>
+                  <input
+                    type="url"
+                    value={nextcloudUrl}
+                    onChange={e => setNextcloudUrl(e.target.value)}
+                    placeholder="cth: https://nextcloud.syarikat.com"
+                    className="w-full border border-slate-200 bg-white p-2.5 rounded-lg focus:border-teal-500 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nama Pengguna (Username)</label>
+                  <input
+                    type="text"
+                    value={nextcloudUser}
+                    onChange={e => setNextcloudUser(e.target.value)}
+                    placeholder="cth: admin"
+                    className="w-full border border-slate-200 bg-white p-2.5 rounded-lg focus:border-teal-500 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Kata Laluan / Token Aplikasi (App Password)</label>
+                  <input
+                    type="password"
+                    value={nextcloudPass}
+                    onChange={e => setNextcloudPass(e.target.value)}
+                    placeholder="Sila masukkan App Token Nextcloud"
+                    className="w-full border border-slate-200 bg-white p-2.5 rounded-lg focus:border-teal-500 outline-none font-mono"
+                  />
+                  <p className="text-[9px] text-slate-400">Digalakkan menggunakan *App Password* daripada tetapan Keselamatan (Security) akaun Nextcloud anda.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Folder Sasaran (Target Folder)</label>
+                  <input
+                    type="text"
+                    value={nextcloudFolder}
+                    onChange={e => setNextcloudFolder(e.target.value)}
+                    placeholder="cth: HMGeomatics/Quotations"
+                    className="w-full border border-slate-200 bg-white p-2.5 rounded-lg focus:border-teal-500 outline-none"
+                  />
+                  <p className="text-[9px] text-slate-400">Folder akan dibina secara automatik oleh sistem jika belum wujud.</p>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 p-3.5 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700">Format Fail Simpanan</span>
+                  <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setNextcloudFormat('MD')}
+                      className={`px-3 py-1 rounded-md text-[10px] font-bold transition ${nextcloudFormat === 'MD' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Formatted Markdown (.md)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNextcloudFormat('JSON')}
+                      className={`px-3 py-1 rounded-md text-[10px] font-bold transition ${nextcloudFormat === 'JSON' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Data Backup (.json)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-slate-500 bg-slate-50 p-2.5 rounded-lg leading-relaxed">
+                  {nextcloudFormat === 'MD' ? (
+                    <span><strong>Formatted Markdown (.md):</strong> Sesuai untuk paparan visual. Fail ini mengandungi surat rasmi sebut harga, jadual butiran, dan tandatangan jurukur yang boleh dibaca dan diedit terus di dalam Nextcloud.</span>
+                  ) : (
+                    <span><strong>Data Backup (.json):</strong> Fail ini menyimpan seluruh objek model data sebut harga (termasuk koordinat, metadata, dan senarai barang) dalam format data mentah untuk pengkomputeran.</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isUploadingNextcloud}
+                  onClick={handleSaveToNextcloud}
+                  className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-bold uppercase tracking-wider py-2.5 px-5 rounded-lg transition shadow-sm flex items-center space-x-1.5 cursor-pointer"
+                >
+                  {isUploadingNextcloud ? (
+                    <>
+                      <span className="inline-block animate-spin mr-1">⌛</span>
+                      <span>Sedang Menghubung & Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 text-teal-200" />
+                      <span>Hantar & Simpan ke Nextcloud</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
           {isIframe() && (
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
