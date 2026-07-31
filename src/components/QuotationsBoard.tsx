@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, Search, Trash2, Edit, Eye, Printer, Download, X, Briefcase, 
   AlertTriangle, FileText, Check, ChevronRight, FileSpreadsheet, Calculator, ClipboardList
@@ -51,6 +51,7 @@ export default function QuotationsBoard({
   const [nextcloudUser, setNextcloudUser] = useState('HMGeomatics-Admin');
   const [nextcloudPass, setNextcloudPass] = useState('hmg-app-token-2026');
   const [nextcloudFolder, setNextcloudFolder] = useState('HMGeomatics/Quotations');
+  const [nextcloudFilename, setNextcloudFilename] = useState('QUOTE-JT001');
   const [nextcloudFormat, setNextcloudFormat] = useState<'MD' | 'JSON'>('MD');
   const [isUploadingNextcloud, setIsUploadingNextcloud] = useState(false);
 
@@ -132,8 +133,13 @@ ${itemsTable}
     setIsUploadingNextcloud(true);
     try {
       const fileExt = nextcloudFormat === 'MD' ? 'md' : 'json';
-      const refNo = `HMG-QT-2026-${selectedQuote.id.split('-')[1]?.substring(0, 4) || '0142'}`;
-      const filename = `${refNo}.${fileExt}`;
+      let cleanFilename = nextcloudFilename.trim();
+      if (!cleanFilename) {
+        cleanFilename = 'QUOTE-JT001';
+      }
+      if (!cleanFilename.toLowerCase().endsWith(`.${fileExt}`)) {
+        cleanFilename = `${cleanFilename}.${fileExt}`;
+      }
       
       let fileContent = '';
       if (nextcloudFormat === 'MD') {
@@ -152,7 +158,7 @@ ${itemsTable}
           username: nextcloudUser,
           password: nextcloudPass,
           folder: nextcloudFolder,
-          filename,
+          filename: cleanFilename,
           content: fileContent
         })
       });
@@ -179,6 +185,14 @@ ${itemsTable}
       return true;
     }
   };
+
+  // Sync Nextcloud Filename dynamically with selected quotation REF NO
+  useEffect(() => {
+    if (selectedQuote) {
+      const refNo = `HMG-${previewDocType === 'Quotation' ? 'QT' : 'PROP'}-2026-${selectedQuote.id.split('-')[1]?.substring(0, 4) || '0142'}`;
+      setNextcloudFilename(refNo);
+    }
+  }, [selectedQuote, previewDocType]);
 
   // Calculator Form State
   const [table, setTable] = useState<'I' | 'II' | 'III' | 'IV' | 'V' | 'VI' | 'VII'>('I');
@@ -1538,7 +1552,20 @@ ${itemsTable}
                     notify('error', 'Cetak disekat di dalam frame pratonton. Sila klik "Open in new tab" terlebih dahulu!');
                     alert('FUNGSI CETAK DIHADANG DI DALAM IFRAME:\n\nSila buka aplikasi ini dalam Tab Baru terlebih dahulu menggunakan butang "Open in new tab" (ikon anak panah/segiempat di penjuru kanan atas panel pratonton) untuk membolehkan pencetakan atau simpanan PDF berfungsi dengan sempurna.');
                   } else {
+                    const originalTitle = document.title;
+                    const refNo = selectedQuote 
+                      ? `HMG-${previewDocType === 'Quotation' ? 'QT' : 'PROP'}-2026-${selectedQuote.id.split('-')[1]?.substring(0, 4) || '0142'}`
+                      : 'SEBUT-HARGA';
+                    
+                    // Temporarily set the document title to the Quotation's actual Reference Number.
+                    // This sets the default print PDF export file name to this exact reference ID.
+                    document.title = refNo;
                     window.print();
+                    
+                    // Restore original title shortly after print dialog opens
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 500);
                   }
                 }}
                 className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg shadow transition flex items-center space-x-1.5 cursor-pointer"
@@ -1624,6 +1651,18 @@ ${itemsTable}
                   />
                   <p className="text-[9px] text-slate-400">Folder akan dibina secara automatik oleh sistem jika belum wujud.</p>
                 </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-teal-800">Nama Fail Simpanan (Filename)</label>
+                  <input
+                    type="text"
+                    value={nextcloudFilename}
+                    onChange={e => setNextcloudFilename(e.target.value)}
+                    placeholder="cth: QUOTE-JT001"
+                    className="w-full border border-teal-300 bg-teal-50/20 p-2.5 rounded-lg focus:border-teal-500 focus:bg-white outline-none font-mono font-bold text-slate-800"
+                  />
+                  <p className="text-[9px] text-slate-400">Cth: <strong>QUOTE-JT001</strong>. Ekstensi (.md atau .json) akan ditambah secara automatik.</p>
+                </div>
               </div>
 
               <div className="bg-white border border-slate-200 p-3.5 rounded-xl space-y-2.5">
@@ -1699,7 +1738,7 @@ ${itemsTable}
           )}
 
           {/* Letterhead Container */}
-          <div className="bg-white border border-slate-300 p-8 sm:p-12 max-w-4xl mx-auto shadow-md font-sans text-slate-800 leading-relaxed print:border-none print:shadow-none print:p-0">
+          <div className="bg-white border border-slate-300 p-8 sm:p-12 max-w-4xl mx-auto shadow-md font-sans text-slate-800 leading-relaxed print:border-none print:shadow-none print:p-0 print-document-container">
             
             {/* Elegant Header Letterhead */}
             <div className="border-b-4 border-[#18181A] pb-6 flex flex-col sm:flex-row justify-between items-start gap-4">
