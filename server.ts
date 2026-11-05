@@ -569,8 +569,71 @@ async function startServer() {
   });
 
   // ---------------------------------------------------------
-  // NEXTCLOUD WEBDAV UPLOAD PROXY API
+  // NEXTCLOUD WEBDAV TEST CONNECTION & PROXY API
   // ---------------------------------------------------------
+  app.post('/api/nextcloud/test-connection', async (req, res) => {
+    try {
+      const { nextcloudUrl, username, password } = req.body;
+      if (!nextcloudUrl || !username || !password) {
+        return res.status(400).json({ success: false, error: 'Server URL, username, and app token are required.' });
+      }
+
+      let baseUrl = nextcloudUrl.trim().replace(/\/+$/, '');
+      const davUrl = `${baseUrl}/remote.php/dav/files/${encodeURIComponent(username.trim())}/`;
+      const authHeader = 'Basic ' + Buffer.from(`${username.trim()}:${password.trim()}`).toString('base64');
+
+      // Nextcloud WebDAV root propfind
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+      const response = await fetch(davUrl, {
+        method: 'PROPFIND',
+        signal: controller.signal,
+        headers: {
+          'Authorization': authHeader,
+          'Depth': '0',
+          'Content-Type': 'application/xml',
+          'User-Agent': 'HMGeomatics-ERP-Client/1.0',
+        },
+      });
+      clearTimeout(timeoutId);
+
+      // WebDAV returns 207 Multi-Status for successful PROPFIND or 200 OK
+      if (response.ok || response.status === 207) {
+        return res.json({ 
+          success: true, 
+          status: response.status,
+          message: `Verified WebDAV connection to ${baseUrl.replace(/^https?:\/\//, '')}`
+        });
+      } else if (response.status === 401 || response.status === 403) {
+        return res.status(401).json({ 
+          success: false, 
+          status: response.status,
+          error: 'Authentication failed: Invalid username or App Password / Token. Please check your Nextcloud credentials.' 
+        });
+      } else if (response.status === 404) {
+        return res.status(404).json({
+          success: false,
+          status: response.status,
+          error: `Nextcloud user directory not found at ${davUrl}. Please check the server URL and username.`
+        });
+      } else {
+        return res.status(response.status).json({ 
+          success: false, 
+          status: response.status,
+          error: `Nextcloud returned HTTP status ${response.status} (${response.statusText || 'Error'})` 
+        });
+      }
+    } catch (err: any) {
+      console.error('Nextcloud connection test error:', err);
+      const isAbort = err.name === 'AbortError';
+      return res.status(500).json({ 
+        success: false, 
+        error: isAbort ? 'Connection timed out after 10 seconds. Check server URL and network connectivity.' : (err.message || 'Unable to establish network connection to host.')
+      });
+    }
+  });
+
   app.post('/api/nextcloud/upload', async (req, res) => {
     try {
       const { nextcloudUrl, username, password, folder, filename, content } = req.body;

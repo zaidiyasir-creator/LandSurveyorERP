@@ -47,10 +47,13 @@ export default function QuotationsBoard({
 
   // Nextcloud state integration
   const [showNextcloudPanel, setShowNextcloudPanel] = useState(false);
-  const [nextcloudUrl, setNextcloudUrl] = useState('https://demo.nextcloud.com');
-  const [nextcloudUser, setNextcloudUser] = useState('HMGeomatics-Admin');
-  const [nextcloudPass, setNextcloudPass] = useState('hmg-app-token-2026');
-  const [nextcloudFolder, setNextcloudFolder] = useState('HMGeomatics/Quotations');
+  const [nextcloudUrl, setNextcloudUrl] = useState(() => localStorage.getItem('hmgeomatics_nc_server_url') || 'https://demo.nextcloud.com');
+  const [nextcloudUser, setNextcloudUser] = useState(() => localStorage.getItem('hmgeomatics_nc_username') || 'HMGeomatics-Admin');
+  const [nextcloudPass, setNextcloudPass] = useState(() => localStorage.getItem('hmgeomatics_nc_password') || 'hmg-app-token-2026');
+  const [nextcloudFolder, setNextcloudFolder] = useState(() => {
+    const root = localStorage.getItem('hmgeomatics_nc_root_folder');
+    return root ? `${root}/Quotations` : 'HMGeomatics/Quotations';
+  });
   const [nextcloudFilename, setNextcloudFilename] = useState('QUOTE-JT001');
   const [nextcloudFormat, setNextcloudFormat] = useState<'MD' | 'JSON'>('MD');
   const [isUploadingNextcloud, setIsUploadingNextcloud] = useState(false);

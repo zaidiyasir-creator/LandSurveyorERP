@@ -409,17 +409,36 @@ export default function App() {
   const [ncConnectionStatus, setNcConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [showNcPassword, setShowNcPassword] = useState<boolean>(false);
 
-  const handleTestNcConnection = () => {
+  const handleTestNcConnection = async () => {
+    if (!ncServerUrl.trim() || !ncUsername.trim() || !ncPassword.trim()) {
+      notify('error', 'Connection failed. Please specify a valid server URL, username, and app token.');
+      return;
+    }
+
     setNcConnectionStatus('testing');
-    setTimeout(() => {
-      if (ncServerUrl.trim() && ncUsername.trim() && ncPassword.trim()) {
+    try {
+      const response = await fetch('/api/nextcloud/test-connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nextcloudUrl: ncServerUrl,
+          username: ncUsername,
+          password: ncPassword,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
         setNcConnectionStatus('success');
-        notify('success', `Successfully connected to Nextcloud WebDAV at ${ncServerUrl.replace('https://', '').replace('http://', '')}`);
+        notify('success', `Live connection verified: ${data.message}`);
       } else {
         setNcConnectionStatus('error');
-        notify('error', 'Connection failed. Please specify a valid server URL, username, and app token.');
+        notify('error', `Nextcloud check failed: ${data.error || 'Server unreachable'}`);
       }
-    }, 1000);
+    } catch (err: any) {
+      setNcConnectionStatus('error');
+      notify('error', `Connection error: ${err.message || 'Network failure'}`);
+    }
   };
 
   const handleSaveNcSettings = (e: React.FormEvent) => {
