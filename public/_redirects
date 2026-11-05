@@ -1,0 +1,2 @@
+/api/nextcloud/* /.netlify/functions/nextcloud/:splat 200
+/* /index.html 200

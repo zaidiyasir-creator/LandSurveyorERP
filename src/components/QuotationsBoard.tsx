@@ -49,7 +49,7 @@ export default function QuotationsBoard({
   const [showNextcloudPanel, setShowNextcloudPanel] = useState(false);
   const [nextcloudUrl, setNextcloudUrl] = useState(() => localStorage.getItem('hmgeomatics_nc_server_url') || 'https://drive.jteras.com');
   const [nextcloudUser, setNextcloudUser] = useState(() => localStorage.getItem('hmgeomatics_nc_username') || 'zaidi.yasir');
-  const [nextcloudPass, setNextcloudPass] = useState(() => localStorage.getItem('hmgeomatics_nc_password') || '');
+  const [nextcloudPass, setNextcloudPass] = useState(() => localStorage.getItem('hmgeomatics_nc_password') || 'Twrfy-B9Mpj-WBcT2-62xER-Bng7H');
   const [nextcloudFolder, setNextcloudFolder] = useState(() => {
     const root = localStorage.getItem('hmgeomatics_nc_root_folder');
     return root ? `${root}/Quotations` : '01_Project_Documents/Quotations';
