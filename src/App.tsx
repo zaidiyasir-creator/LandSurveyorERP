@@ -58,11 +58,14 @@ import {
   ArrowDown,
   Maximize2,
   Minimize2,
-  GripVertical
+  GripVertical,
+  Upload,
+  Image as ImageIcon,
+  RotateCcw
 } from 'lucide-react';
 
 import { Client, Project, Submission, Equipment, Payroll, BoundaryDispute, LicensedSurveyor, Quotation, Leave, Attendance, RateSheet, JobSchedule } from './types';
-import { HMLogo } from './components/HMLogo';
+import { HMLogo, getStoredCustomLogo, saveStoredCustomLogo, getStoredCompanyName, saveStoredCompanyName } from './components/HMLogo';
 
 export const DEFAULT_RATE_SHEET: RateSheet = {
   id: 'default-rate-sheet',
@@ -379,6 +382,64 @@ export default function App() {
     localStorage.setItem('hmgeomatics_nc_password', ncPassword);
     localStorage.setItem('hmgeomatics_nc_root_folder', ncRootFolder);
     notify('success', 'Nextcloud Workspace credentials and server settings saved successfully.');
+  };
+
+  // Company Logo & Branding Settings
+  const [customLogo, setCustomLogoState] = useState<string | null>(() => getStoredCustomLogo());
+  const [logoFileName, setLogoFileName] = useState<string>('');
+  const [logoFileSize, setLogoFileSize] = useState<string>('');
+  const [customCompanyNameInput, setCustomCompanyNameInput] = useState<string>(() => getStoredCompanyName());
+  const [isDraggingLogo, setIsDraggingLogo] = useState(false);
+  const logoFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleLogoFileUpload = (file: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      notify('error', 'Please select a valid image file (PNG, JPG, SVG, WebP, GIF).');
+      return;
+    }
+    // Limit to 4MB for localStorage performance & reliability
+    if (file.size > 4 * 1024 * 1024) {
+      notify('error', 'Logo file size exceeds 4MB. Please upload a smaller image.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (dataUrl) {
+        saveStoredCustomLogo(dataUrl);
+        setCustomLogoState(dataUrl);
+        setLogoFileName(file.name);
+        setLogoFileSize(`${(file.size / 1024).toFixed(1)} KB`);
+        notify('success', `Logo "${file.name}" uploaded successfully and applied across portal and documents.`);
+      }
+    };
+    reader.onerror = () => {
+      notify('error', 'Failed to read image file.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleResetLogo = () => {
+    saveStoredCustomLogo(null);
+    setCustomLogoState(null);
+    setLogoFileName('');
+    setLogoFileSize('');
+    if (logoFileInputRef.current) {
+      logoFileInputRef.current.value = '';
+    }
+    notify('success', 'Reset to default official HMGeomatics vector logo.');
+  };
+
+  const handleSaveCompanyName = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customCompanyNameInput.trim()) {
+      notify('error', 'Company name cannot be empty.');
+      return;
+    }
+    saveStoredCompanyName(customCompanyNameInput.trim());
+    notify('success', `Company branding name saved as "${customCompanyNameInput.trim()}".`);
   };
 
   // Loading States & Error Handlers
@@ -4685,7 +4746,163 @@ export default function App() {
                   
                   <div className="border-b border-slate-200 pb-5">
                     <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Settings & Account Security</h2>
-                    <p className="text-sm text-slate-500">Configure your user profile, change account security credentials, and view system permissions.</p>
+                    <p className="text-sm text-slate-500">Configure your user profile, upload company branding logos, change security credentials, and view system permissions.</p>
+                  </div>
+
+                  {/* COMPANY BRANDING & LOGO UPLOAD CARD */}
+                  <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 mb-6 gap-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-lg bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600">
+                          <ImageIcon className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h3 className="font-bold text-slate-900 text-base font-sans">Company Branding & Official Logo</h3>
+                            {customLogo ? (
+                              <span className="text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                Custom Logo Active
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-mono bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider">
+                                Default Vector Logo
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 font-sans mt-0.5">
+                            Upload your company logo to display on the navigation header, sidebar, portal login, and official quotation letterheads.
+                          </p>
+                        </div>
+                      </div>
+
+                      {customLogo && (
+                        <button
+                          type="button"
+                          onClick={handleResetLogo}
+                          className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition cursor-pointer self-start sm:self-auto shrink-0"
+                          title="Restore default official HMGeomatics logo"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Reset to Default Logo</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                      {/* UPLOAD DROPZONE & CONTROLS */}
+                      <div className="lg:col-span-7 space-y-4">
+                        <input
+                          ref={logoFileInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleLogoFileUpload(file);
+                          }}
+                        />
+
+                        {/* DRAG & DROP ZONE */}
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setIsDraggingLogo(true);
+                          }}
+                          onDragLeave={() => setIsDraggingLogo(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setIsDraggingLogo(false);
+                            const file = e.dataTransfer.files?.[0];
+                            if (file) handleLogoFileUpload(file);
+                          }}
+                          onClick={() => logoFileInputRef.current?.click()}
+                          className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[170px] ${
+                            isDraggingLogo
+                              ? 'border-teal-500 bg-teal-50/50 scale-[0.99]'
+                              : 'border-slate-300 hover:border-teal-400 hover:bg-slate-50/60 bg-slate-50/30'
+                          }`}
+                        >
+                          <div className="w-12 h-12 rounded-full bg-teal-100/70 text-teal-600 flex items-center justify-center mb-3">
+                            <Upload className="w-6 h-6" />
+                          </div>
+                          <p className="text-xs font-bold text-slate-800">
+                            Click to upload <span className="font-normal text-slate-500">or drag and drop logo here</span>
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            PNG, JPG, SVG, WebP, or GIF (Transparent background PNG or SVG recommended, max 4MB)
+                          </p>
+                          {logoFileName && (
+                            <div className="mt-3 inline-flex items-center space-x-1.5 px-2.5 py-1 rounded bg-teal-50 text-teal-800 border border-teal-200 text-[11px] font-mono">
+                              <CheckCircle className="w-3.5 h-3.5 text-teal-600" />
+                              <span>{logoFileName}</span>
+                              {logoFileSize && <span className="text-teal-500">({logoFileSize})</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* COMPANY BRANDING NAME CUSTOMIZATION */}
+                        <form onSubmit={handleSaveCompanyName} className="flex items-center space-x-2 pt-1">
+                          <div className="flex-1">
+                            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1 font-mono">
+                              Company / Portal Brand Name
+                            </label>
+                            <input
+                              type="text"
+                              value={customCompanyNameInput}
+                              onChange={(e) => setCustomCompanyNameInput(e.target.value)}
+                              placeholder="e.g. HMGeomatics"
+                              className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold py-2.5 px-4 rounded-lg transition cursor-pointer mt-5 shadow-xs shrink-0 flex items-center space-x-1"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Save Name</span>
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* LIVE LOGO PREVIEWS (DARK THEME & LIGHT THEME) */}
+                      <div className="lg:col-span-5 flex flex-col space-y-3">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                          Live Rendering Preview
+                        </span>
+
+                        {/* 1. Dark Mode / Sidebar Simulation */}
+                        <div className="bg-[#18181A] border border-slate-800 rounded-xl p-4 flex flex-col justify-between text-white relative overflow-hidden shadow-xs">
+                          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-[10px] text-slate-400 font-mono uppercase tracking-wider">
+                            <span>Sidebar & Header Dark Theme</span>
+                            <span className="text-teal-400">Live</span>
+                          </div>
+                          <div className="py-2 flex items-center space-x-3">
+                            <HMLogo size={46} showText={true} />
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-2 font-sans">
+                            Displayed on main navigation bar, collapsed menus, and mobile bar.
+                          </div>
+                        </div>
+
+                        {/* 2. White Paper / Quotations Simulation */}
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between text-slate-800 relative overflow-hidden shadow-xs">
+                          <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 text-[10px] text-slate-400 font-mono uppercase tracking-wider">
+                            <span>Letterhead & Document Light Theme</span>
+                            <span className="text-teal-600 font-bold">Paper Preview</span>
+                          </div>
+                          <div className="py-2 flex items-center space-x-3">
+                            <HMLogo size={46} textColor="text-slate-900" />
+                            <div>
+                              <div className="text-sm font-black text-slate-900 tracking-tight">{customCompanyNameInput || 'HMGeomatics'} Sdn Bhd</div>
+                              <div className="text-[9px] text-slate-500 uppercase tracking-widest font-mono">Official Survey Quotations & Cadastral Plans</div>
+                            </div>
+                          </div>
+                          <div className="text-[10px] text-slate-500 mt-2 font-sans">
+                            Rendered at the top of client quotations, JUPEM transmittals, and tax invoices.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
