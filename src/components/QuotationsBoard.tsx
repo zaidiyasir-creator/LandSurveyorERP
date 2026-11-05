@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Search, Trash2, Edit, Eye, Printer, Download, X, Briefcase, 
-  AlertTriangle, FileText, Check, ChevronRight, FileSpreadsheet, Calculator, ClipboardList
+  AlertTriangle, FileText, Check, ChevronRight, FileSpreadsheet, Calculator, ClipboardList,
+  UserPlus, Award, Building, Phone, Mail, MapPin
 } from 'lucide-react';
 import { Client, Project, Quotation, LicensedSurveyor, RateSheet } from '../types';
 import { HMLogo } from './HMLogo';
@@ -13,6 +14,8 @@ interface Props {
   quotations: Quotation[];
   setQuotations: React.Dispatch<React.SetStateAction<Quotation[]>>;
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
+  setClients?: React.Dispatch<React.SetStateAction<Client[]>>;
+  setSurveyors?: React.Dispatch<React.SetStateAction<LicensedSurveyor[]>>;
   setActiveTab: (tab: any) => void;
   notify: (type: 'success' | 'error', message: string) => void;
   rateSheets?: RateSheet[];
@@ -28,6 +31,8 @@ export default function QuotationsBoard({
   quotations,
   setQuotations,
   setProjects,
+  setClients,
+  setSurveyors,
   setActiveTab,
   notify,
   rateSheets = [],
@@ -204,6 +209,142 @@ ${itemsTable}
   const [surveyorId, setSurveyorId] = useState(surveyors[0]?.id || 'ls-1');
   const [timelineWeeks, setTimelineWeeks] = useState(8);
   const [selectedRateSheetId, setSelectedRateSheetId] = useState<string>(activeRateSheetId);
+
+  // Quick Add Client & Surveyor States
+  const [showQuickAddClient, setShowQuickAddClient] = useState(false);
+  const [showQuickAddSurveyor, setShowQuickAddSurveyor] = useState(false);
+
+  // Auto-sync selection if initial list was empty
+  useEffect(() => {
+    if (!clientId && clients.length > 0) {
+      setClientId(clients[0].id);
+    }
+  }, [clients, clientId]);
+
+  useEffect(() => {
+    if (!surveyorId && surveyors.length > 0) {
+      setSurveyorId(surveyors[0].id);
+    }
+  }, [surveyors, surveyorId]);
+
+  // Client quick form state
+  const [quickClientForm, setQuickClientForm] = useState({
+    nama: '',
+    mykad_roc: '',
+    telefon: '',
+    email: '',
+    daerah: 'Seremban',
+    negeri: 'Negeri Sembilan',
+    mukim: 'Mukim Rasah',
+    alamat: '',
+    poa_ref: '',
+  });
+
+  // Surveyor quick form state
+  const [quickSurveyorForm, setQuickSurveyorForm] = useState({
+    nama: '',
+    license_number: '',
+    pii_membership_no: '',
+    chargeable_rate: 350,
+    renewal_date: '2026-12-31',
+  });
+
+  const handleQuickCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickClientForm.nama.trim()) {
+      notify('error', 'Sila masukkan nama penuh klien atau syarikat.');
+      return;
+    }
+
+    const newClient: Client = {
+      id: `client-${Date.now()}`,
+      nama: quickClientForm.nama.trim(),
+      mykad_roc: quickClientForm.mykad_roc.trim() || '-',
+      email: quickClientForm.email.trim() || 'klien@hmgeomatics.com',
+      telefon: quickClientForm.telefon.trim() || '-',
+      alamat: quickClientForm.alamat.trim() || 'Negeri Sembilan, Malaysia',
+      mukim: quickClientForm.mukim.trim() || 'Mukim Rasah',
+      daerah: quickClientForm.daerah.trim() || 'Seremban',
+      negeri: quickClientForm.negeri.trim() || 'Negeri Sembilan',
+      poa_ref: quickClientForm.poa_ref.trim() || '-',
+      created_at: new Date().toISOString(),
+    };
+
+    // Update parent and local clients state
+    if (setClients) {
+      setClients(prev => [newClient, ...prev]);
+    }
+    // Select newly created client immediately in calculator
+    setClientId(newClient.id);
+
+    try {
+      await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newClient),
+      });
+    } catch (err) {
+      // Offline fallback
+    }
+
+    notify('success', `Klien "${newClient.nama}" berjaya didaftarkan dan dipilih!`);
+    setShowQuickAddClient(false);
+    setQuickClientForm({
+      nama: '',
+      mykad_roc: '',
+      telefon: '',
+      email: '',
+      daerah: 'Seremban',
+      negeri: 'Negeri Sembilan',
+      mukim: 'Mukim Rasah',
+      alamat: '',
+      poa_ref: '',
+    });
+  };
+
+  const handleQuickCreateSurveyor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickSurveyorForm.nama.trim() || !quickSurveyorForm.license_number.trim()) {
+      notify('error', 'Sila masukkan nama dan nombor lesen LLS jurukur.');
+      return;
+    }
+
+    const newSurveyor: LicensedSurveyor = {
+      id: `ls-${Date.now()}`,
+      nama: quickSurveyorForm.nama.trim(),
+      license_number: quickSurveyorForm.license_number.trim(),
+      renewal_date: quickSurveyorForm.renewal_date || '2026-12-31',
+      pii_membership_no: quickSurveyorForm.pii_membership_no.trim() || `PII ${Math.floor(1000 + Math.random() * 9000)}`,
+      chargeable_rate: Number(quickSurveyorForm.chargeable_rate) || 350,
+    };
+
+    // Update parent and local surveyors state
+    if (setSurveyors) {
+      setSurveyors(prev => [newSurveyor, ...prev]);
+    }
+    // Select newly created surveyor immediately in calculator
+    setSurveyorId(newSurveyor.id);
+
+    try {
+      await fetch('/api/surveyors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSurveyor),
+      });
+    } catch (err) {
+      // Offline fallback
+    }
+
+    notify('success', `Jurukur "${newSurveyor.nama}" (${newSurveyor.license_number}) berjaya didaftarkan dan dipilih!`);
+    setShowQuickAddSurveyor(false);
+    setQuickSurveyorForm({
+      nama: '',
+      license_number: '',
+      pii_membership_no: '',
+      chargeable_rate: 350,
+      renewal_date: '2026-12-31',
+    });
+  };
 
   // Retrieve active rate sheet based on state
   const activeRateSheet = (rateSheets || []).find(s => s.id === selectedRateSheetId) || (rateSheets && rateSheets[0]) || {
@@ -928,27 +1069,67 @@ ${itemsTable}
             {/* General Fields */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-mono font-bold text-slate-400 uppercase">Klien Utama</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-mono font-bold text-slate-400 uppercase">Klien Utama</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickAddClient(true)}
+                    className="inline-flex items-center text-[10px] font-bold text-teal-600 hover:text-teal-700 hover:underline cursor-pointer transition"
+                    title="Tambah Klien Baharu"
+                  >
+                    <Plus className="w-3 h-3 mr-0.5" /> + Klien
+                  </button>
+                </div>
                 <select 
                   value={clientId}
-                  onChange={e => setClientId(e.target.value)}
+                  onChange={e => {
+                    if (e.target.value === '__ADD_NEW__') {
+                      setShowQuickAddClient(true);
+                    } else {
+                      setClientId(e.target.value);
+                    }
+                  }}
                   className="w-full border border-slate-200 rounded-lg p-2 text-xs bg-white focus:border-slate-400 outline-none"
                 >
+                  <option value="" disabled>-- Pilih Klien --</option>
                   {clients.map(c => (
                     <option key={c.id} value={c.id}>{c.nama}</option>
                   ))}
+                  <option value="__ADD_NEW__" className="text-teal-600 font-bold bg-teal-50">
+                    ➕ + Tambah Klien Baharu...
+                  </option>
                 </select>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-mono font-bold text-slate-400 uppercase">Jurukur Berlesen</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-mono font-bold text-slate-400 uppercase">Jurukur Berlesen</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickAddSurveyor(true)}
+                    className="inline-flex items-center text-[10px] font-bold text-teal-600 hover:text-teal-700 hover:underline cursor-pointer transition"
+                    title="Tambah Jurukur Berlesen Baharu"
+                  >
+                    <Plus className="w-3 h-3 mr-0.5" /> + Jurukur
+                  </button>
+                </div>
                 <select 
                   value={surveyorId}
-                  onChange={e => setSurveyorId(e.target.value)}
+                  onChange={e => {
+                    if (e.target.value === '__ADD_NEW__') {
+                      setShowQuickAddSurveyor(true);
+                    } else {
+                      setSurveyorId(e.target.value);
+                    }
+                  }}
                   className="w-full border border-slate-200 rounded-lg p-2 text-xs bg-white focus:border-slate-400 outline-none"
                 >
+                  <option value="" disabled>-- Pilih Jurukur --</option>
                   {surveyors.map(s => (
                     <option key={s.id} value={s.id}>{s.nama} ({s.license_number})</option>
                   ))}
+                  <option value="__ADD_NEW__" className="text-teal-600 font-bold bg-teal-50">
+                    ➕ + Tambah Jurukur Baharu...
+                  </option>
                 </select>
               </div>
               <div className="space-y-1">
@@ -1961,6 +2142,258 @@ ${itemsTable}
 
           </div>
 
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* QUICK ADD CLIENT MODAL */}
+      {/* ======================================================== */}
+      {showQuickAddClient && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm font-sans uppercase tracking-tight">Daftar Klien Baharu (Quick Add)</h3>
+                  <p className="text-[11px] text-slate-500 font-sans">Daftar klien dan pilih secara automatik dalam kalkulator ini.</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowQuickAddClient(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickCreateClient} className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 font-sans">
+                  Nama Penuh Klien / Syarikat *
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="cth: Perbadanan Kemajuan Negeri / Dato' Ahmad" 
+                  value={quickClientForm.nama}
+                  onChange={e => setQuickClientForm({ ...quickClientForm, nama: e.target.value })}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 font-sans">
+                    No. MyKad / ROC SSM
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="cth: 900101-05-5555 / 202401002233" 
+                    value={quickClientForm.mykad_roc}
+                    onChange={e => setQuickClientForm({ ...quickClientForm, mykad_roc: e.target.value })}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 font-sans">
+                    No. Telefon *
+                  </label>
+                  <input 
+                    type="tel" 
+                    placeholder="cth: 012-3456789" 
+                    value={quickClientForm.telefon}
+                    onChange={e => setQuickClientForm({ ...quickClientForm, telefon: e.target.value })}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 font-sans">
+                    Emel Klien
+                  </label>
+                  <input 
+                    type="email" 
+                    placeholder="klien@example.com" 
+                    value={quickClientForm.email}
+                    onChange={e => setQuickClientForm({ ...quickClientForm, email: e.target.value })}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 font-sans">
+                    Daerah / Negeri
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="Seremban, Negeri Sembilan" 
+                    value={`${quickClientForm.daerah}, ${quickClientForm.negeri}`}
+                    onChange={e => {
+                      const parts = e.target.value.split(',');
+                      setQuickClientForm({
+                        ...quickClientForm,
+                        daerah: parts[0]?.trim() || quickClientForm.daerah,
+                        negeri: parts[1]?.trim() || quickClientForm.negeri,
+                      });
+                    }}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 font-sans">
+                  Alamat Surat-Menyurat
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="Alamat premis / pejabat klien..." 
+                  value={quickClientForm.alamat}
+                  onChange={e => setQuickClientForm({ ...quickClientForm, alamat: e.target.value })}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2.5">
+                <button 
+                  type="button" 
+                  onClick={() => setShowQuickAddClient(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer font-sans"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition shadow-xs cursor-pointer font-sans"
+                >
+                  Simpan &amp; Pilih Klien
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* QUICK ADD SURVEYOR MODAL */}
+      {/* ======================================================== */}
+      {showQuickAddSurveyor && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
+                  <Award className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm font-sans uppercase tracking-tight">Daftar Jurukur Berlesen (Quick Add)</h3>
+                  <p className="text-[11px] text-slate-500 font-sans">Daftar jurukur tanah bertauliah LJT dan pilih dalam kalkulator.</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowQuickAddSurveyor(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickCreateSurveyor} className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 font-sans">
+                  Nama Penuh Jurukur Berlesen *
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="cth: Sr Mohd Khairul bin Othman" 
+                  value={quickSurveyorForm.nama}
+                  onChange={e => setQuickSurveyorForm({ ...quickSurveyorForm, nama: e.target.value })}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 font-sans">
+                    No. Lesen LLS LJT *
+                  </label>
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="cth: LLS 0892" 
+                    value={quickSurveyorForm.license_number}
+                    onChange={e => setQuickSurveyorForm({ ...quickSurveyorForm, license_number: e.target.value })}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 font-sans">
+                    No. Keahlian PII / PEJUTA
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="cth: PII 1420" 
+                    value={quickSurveyorForm.pii_membership_no}
+                    onChange={e => setQuickSurveyorForm({ ...quickSurveyorForm, pii_membership_no: e.target.value })}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 font-sans">
+                    Kadar Caj Jam (RM / Jam)
+                  </label>
+                  <input 
+                    type="number" 
+                    min="100"
+                    max="2000"
+                    placeholder="350" 
+                    value={quickSurveyorForm.chargeable_rate}
+                    onChange={e => setQuickSurveyorForm({ ...quickSurveyorForm, chargeable_rate: Number(e.target.value) || 350 })}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1 font-sans">
+                    Tarikh Sah / Pembaharuan Lesen
+                  </label>
+                  <input 
+                    type="date" 
+                    value={quickSurveyorForm.renewal_date}
+                    onChange={e => setQuickSurveyorForm({ ...quickSurveyorForm, renewal_date: e.target.value })}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2.5">
+                <button 
+                  type="button" 
+                  onClick={() => setShowQuickAddSurveyor(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer font-sans"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition shadow-xs cursor-pointer font-sans"
+                >
+                  Simpan &amp; Pilih Jurukur
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

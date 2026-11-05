@@ -3423,6 +3423,8 @@ export default function App() {
                     quotations={quotations}
                     setQuotations={setQuotations}
                     setProjects={setProjects}
+                    setClients={setClients}
+                    setSurveyors={setSurveyors}
                     setActiveTab={setActiveTab}
                     notify={notify}
                     rateSheets={rateSheets}
