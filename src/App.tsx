@@ -2144,7 +2144,7 @@ export default function App() {
         {/* FLOATING NOTIFICATION BANNER */}
         {notification && (
           <div
-            className={`fixed bottom-5 right-5 z-50 flex items-center space-x-2 px-5 py-3 rounded-lg shadow-xl border text-sm transition-all duration-300 ${
+            className={`fixed bottom-5 left-5 md:left-[calc(16rem+1.25rem)] z-50 flex items-center space-x-2 px-5 py-3 rounded-lg shadow-xl border text-sm transition-all duration-300 ${
               notification.type === 'success'
                 ? 'bg-slate-900 text-teal-300 border-teal-500'
                 : 'bg-red-950 text-red-200 border-red-500'
