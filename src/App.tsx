@@ -64,7 +64,8 @@ import {
   RotateCcw,
   Sliders,
   Shield,
-  UserCheck
+  UserCheck,
+  ExternalLink
 } from 'lucide-react';
 
 import { Client, Project, Submission, Equipment, Payroll, BoundaryDispute, LicensedSurveyor, Quotation, Leave, Attendance, RateSheet, JobSchedule } from './types';
@@ -397,17 +398,21 @@ export default function App() {
     return localStorage.getItem('hmgeomatics_nc_server_url') || 'https://drive.jteras.com';
   });
   const [ncUsername, setNcUsername] = useState<string>(() => {
-    return localStorage.getItem('hmgeomatics_nc_username') || 'hmgeomatics_admin';
+    return localStorage.getItem('hmgeomatics_nc_username') || 'zaidi.yasir';
   });
   const [ncPassword, setNcPassword] = useState<string>(() => {
-    return localStorage.getItem('hmgeomatics_nc_password') || 'nc_token_8592_geosec';
+    return localStorage.getItem('hmgeomatics_nc_password') || '';
   });
   const [ncRootFolder, setNcRootFolder] = useState<string>(() => {
     return localStorage.getItem('hmgeomatics_nc_root_folder') || '01_Project_Documents';
   });
 
   const [ncConnectionStatus, setNcConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [ncStatusCode, setNcStatusCode] = useState<number | null>(null);
+  const [ncErrorMessage, setNcErrorMessage] = useState<string>('');
+  const [ncServerReachable, setNcServerReachable] = useState<boolean | null>(null);
   const [showNcPassword, setShowNcPassword] = useState<boolean>(false);
+  const [showNcTroubleshootGuide, setShowNcTroubleshootGuide] = useState<boolean>(true);
 
   const handleTestNcConnection = async () => {
     if (!ncServerUrl.trim() || !ncUsername.trim() || !ncPassword.trim()) {
@@ -416,6 +421,10 @@ export default function App() {
     }
 
     setNcConnectionStatus('testing');
+    setNcStatusCode(null);
+    setNcErrorMessage('');
+    setNcServerReachable(null);
+
     try {
       const response = await fetch('/api/nextcloud/test-connection', {
         method: 'POST',
@@ -428,15 +437,25 @@ export default function App() {
       });
 
       const data = await response.json();
-      if (response.ok && data.success) {
+      setNcStatusCode(data.status ?? (response.ok ? 200 : response.status));
+      setNcServerReachable(data.serverReachable ?? response.ok);
+
+      if (data.success) {
         setNcConnectionStatus('success');
+        setNcErrorMessage('');
         notify('success', `Live connection verified: ${data.message}`);
       } else {
         setNcConnectionStatus('error');
-        notify('error', `Nextcloud check failed: ${data.error || 'Server unreachable'}`);
+        setNcErrorMessage(data.error || 'Connection failed');
+        setShowNcTroubleshootGuide(true);
+        notify('error', `Nextcloud check failed: ${data.error || 'Server rejected connection'}`);
       }
     } catch (err: any) {
       setNcConnectionStatus('error');
+      setNcStatusCode(0);
+      setNcServerReachable(false);
+      setNcErrorMessage(err.message || 'Network failure');
+      setShowNcTroubleshootGuide(true);
       notify('error', `Connection error: ${err.message || 'Network failure'}`);
     }
   };
@@ -5161,35 +5180,58 @@ export default function App() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                       {/* INSTRUCTIONS / GUIDANCE */}
-                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-4 h-fit">
-                        <div className="flex items-center space-x-2 text-slate-800">
-                          <Database className="w-4 h-4 text-teal-600" />
-                          <span className="font-bold text-xs uppercase tracking-wider font-sans">WebDAV Setup Guide</span>
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-5 space-y-4 h-fit">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2 text-slate-800">
+                            <Database className="w-4 h-4 text-teal-600" />
+                            <span className="font-bold text-xs uppercase tracking-wider font-sans">WebDAV Setup Guide</span>
+                          </div>
+                          <span className="text-[10px] font-mono bg-teal-100/60 text-teal-800 px-1.5 py-0.5 rounded font-bold">Nextcloud</span>
                         </div>
-                        <p className="text-[11px] text-slate-500 leading-relaxed font-sans">
-                          HMGeomatics syncs raw CAD files, GPS baseline recordings, and boundary maps directly to your self-hosted Nextcloud server.
+
+                        <p className="text-[11px] text-slate-600 leading-relaxed font-sans">
+                          HMGeomatics syncs raw CAD files, GPS baseline recordings, and boundary maps directly to your self-hosted Nextcloud server via WebDAV.
                         </p>
-                        <div className="space-y-2 text-[11px] text-slate-500 font-sans">
-                          <div className="flex items-start space-x-1.5">
-                            <span className="text-teal-600 font-bold">1.</span>
-                            <span>Navigate to your Nextcloud <strong>Settings &gt; Security &gt; Devices & Sessions</strong>.</span>
+
+                        <a 
+                          href={ncServerUrl ? `${ncServerUrl.replace(/\/+$/, '')}/index.php/settings/user/security#apppasswords` : 'https://drive.jteras.com/index.php/settings/user/security#apppasswords'} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between w-full px-3 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-lg text-xs font-semibold transition group shadow-2xs"
+                        >
+                          <span className="flex items-center space-x-1.5">
+                            <Key className="w-3.5 h-3.5 text-teal-700" />
+                            <span>Open Nextcloud Security ↗</span>
+                          </span>
+                          <ExternalLink className="w-3.5 h-3.5 text-teal-600 group-hover:translate-x-0.5 transition" />
+                        </a>
+
+                        <div className="space-y-2.5 text-[11px] text-slate-600 font-sans">
+                          <div className="flex items-start space-x-2">
+                            <span className="w-4 h-4 rounded-full bg-teal-100 text-teal-700 font-bold flex items-center justify-center shrink-0 text-[10px]">1</span>
+                            <span>Open your Nextcloud <strong>Settings &gt; Security</strong> and scroll down to <strong>Devices &amp; sessions</strong>.</span>
                           </div>
-                          <div className="flex items-start space-x-1.5">
-                            <span className="text-teal-600 font-bold">2.</span>
-                            <span>Create a new <strong>App Password / Token</strong> specifically for <code>HMGeomatics_ERP_Client</code>.</span>
+                          <div className="flex items-start space-x-2">
+                            <span className="w-4 h-4 rounded-full bg-teal-100 text-teal-700 font-bold flex items-center justify-center shrink-0 text-[10px]">2</span>
+                            <span>In the <em>App name</em> field, enter <code>HMGeomatics ERP</code> and click <strong>Create new app password</strong>.</span>
                           </div>
-                          <div className="flex items-start space-x-1.5">
-                            <span className="text-teal-600 font-bold">3.</span>
-                            <span>Specify the target workspace root folder name inside Nextcloud (e.g. <code>01_Project_Documents</code>) where surveyors upload CAD drawing archives.</span>
+                          <div className="flex items-start space-x-2">
+                            <span className="w-4 h-4 rounded-full bg-teal-100 text-teal-700 font-bold flex items-center justify-center shrink-0 text-[10px]">3</span>
+                            <span>Copy the generated token and paste it into the <strong>WebDAV App Token / Password</strong> field.</span>
+                          </div>
+                          <div className="flex items-start space-x-2">
+                            <span className="w-4 h-4 rounded-full bg-teal-100 text-teal-700 font-bold flex items-center justify-center shrink-0 text-[10px]">4</span>
+                            <span>Set username as <code>zaidi.yasir</code> and root directory (e.g. <code>01_Project_Documents</code>), then click <strong>Test Connection</strong>.</span>
                           </div>
                         </div>
-                        <div className="p-3 bg-teal-50 border border-teal-100/50 rounded-lg text-[10px] text-teal-800 leading-relaxed font-sans">
-                          <strong>Hardening Tip:</strong> Do not enter your master login password. Using an App Token restricts access and permits revoking the ERP client separately.
+
+                        <div className="p-3 bg-amber-50 border border-amber-200/80 rounded-lg text-[10px] text-amber-900 leading-relaxed font-sans">
+                          <strong>⚠️ Why Master Passwords Fail:</strong> Nextcloud intentionally rejects standard user login passwords over WebDAV for security, returning <strong>401 Unauthorized</strong>. You must create an App Token as shown above.
                         </div>
                       </div>
 
                       {/* INPUT FIELDS */}
-                      <div className="lg:col-span-2">
+                      <div className="lg:col-span-2 space-y-4">
                         <form onSubmit={handleSaveNcSettings} className="space-y-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -5213,7 +5255,7 @@ export default function App() {
                                 value={ncUsername}
                                 onChange={(e) => setNcUsername(e.target.value)}
                                 className="w-full text-sm p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
-                                placeholder="hmgeomatics_admin"
+                                placeholder="zaidi.yasir"
                               />
                             </div>
                           </div>
@@ -5229,7 +5271,7 @@ export default function App() {
                                   value={ncPassword}
                                   onChange={(e) => setNcPassword(e.target.value)}
                                   className="w-full text-sm p-2.5 pr-10 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-mono"
-                                  placeholder="Enter Nextcloud app token"
+                                  placeholder="Paste generated Nextcloud App Token"
                                 />
                                 <button
                                   id="toggle-nc-password-vis"
@@ -5258,27 +5300,33 @@ export default function App() {
 
                           {/* CONNECTION STATUS BADGE & ACTIONS */}
                           <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">Status:</span>
                               {ncConnectionStatus === 'idle' && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-600 border border-slate-200 font-mono">
-                                  Not Tested
+                                <span className="inline-flex items-center px-2.5 py-1 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-600 border border-slate-200 font-mono">
+                                  ⚪ Not Tested
                                 </span>
                               )}
                               {ncConnectionStatus === 'testing' && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200 font-mono animate-pulse">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded text-[10px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200 font-mono animate-pulse">
                                   <RefreshCw className="w-3 h-3 mr-1 animate-spin text-amber-600" />
                                   Pinging WebDAV...
                                 </span>
                               )}
                               {ncConnectionStatus === 'success' && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-teal-50 text-teal-700 border border-teal-200 font-mono">
-                                  🟢 Live: Connection verified
+                                <span className="inline-flex items-center px-2.5 py-1 rounded text-[10px] font-bold uppercase bg-teal-50 text-teal-700 border border-teal-200 font-mono">
+                                  🟢 Live: Connection Verified (HTTP {ncStatusCode || 207})
                                 </span>
                               )}
                               {ncConnectionStatus === 'error' && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-rose-50 text-rose-700 border border-rose-200 font-mono">
-                                  🔴 Connection Refused
+                                <span className="inline-flex items-center px-2.5 py-1 rounded text-[10px] font-bold uppercase bg-rose-50 text-rose-700 border border-rose-200 font-mono">
+                                  {ncStatusCode === 401 
+                                    ? '🔴 HTTP 401: Invalid Credentials / App Token Required' 
+                                    : ncStatusCode === 404
+                                    ? '🔴 HTTP 404: User Directory Not Found'
+                                    : ncStatusCode === 0
+                                    ? '🔴 Host Connection Failed'
+                                    : `🔴 HTTP ${ncStatusCode}: Connection Failed`}
                                 </span>
                               )}
                             </div>
@@ -5289,7 +5337,7 @@ export default function App() {
                                 type="button"
                                 disabled={ncConnectionStatus === 'testing'}
                                 onClick={handleTestNcConnection}
-                                className="px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition cursor-pointer font-sans"
+                                className="px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition cursor-pointer font-sans shadow-2xs"
                               >
                                 {ncConnectionStatus === 'testing' ? 'Testing...' : 'Test Connection'}
                               </button>
@@ -5303,6 +5351,93 @@ export default function App() {
                             </div>
                           </div>
                         </form>
+
+                        {/* DIAGNOSTIC EXPLANATION & TROUBLESHOOTING PANEL */}
+                        {ncConnectionStatus === 'error' && showNcTroubleshootGuide && (
+                          <div className="bg-rose-50/70 border border-rose-200 rounded-xl p-4.5 space-y-3.5 transition-all animate-fadeIn">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-center space-x-2">
+                                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                                <h4 className="font-bold text-xs text-rose-900 uppercase tracking-wide">
+                                  Diagnostic Result: Why Was the Connection Refused?
+                                </h4>
+                              </div>
+                              <span className="text-[10px] font-mono bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-bold">
+                                {ncStatusCode ? `HTTP ${ncStatusCode}` : 'Network Error'}
+                              </span>
+                            </div>
+
+                            {/* Live Connectivity Diagnostics */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                              <div className="p-2.5 bg-white border border-rose-100 rounded-lg flex items-center space-x-2">
+                                <CheckCircle className="w-4 h-4 text-teal-600 shrink-0" />
+                                <div>
+                                  <div className="font-semibold text-slate-800 text-[11px]">Server Reachability:</div>
+                                  <div className="text-[11px] text-teal-700 font-mono">
+                                    {ncServerReachable ? 'Online (drive.jteras.com)' : 'Offline / Host unreachable'}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="p-2.5 bg-white border border-rose-100 rounded-lg flex items-center space-x-2">
+                                {ncStatusCode === 401 ? (
+                                  <Key className="w-4 h-4 text-amber-600 shrink-0" />
+                                ) : (
+                                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                                )}
+                                <div>
+                                  <div className="font-semibold text-slate-800 text-[11px]">Authentication Check:</div>
+                                  <div className="text-[11px] text-rose-700 font-mono">
+                                    {ncStatusCode === 401 ? '401 Unauthorized (Token required)' : (ncErrorMessage || 'Failed')}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Plain English Explanation */}
+                            <div className="text-xs text-slate-700 space-y-1.5 leading-relaxed bg-white/70 p-3 rounded-lg border border-rose-100">
+                              <p className="font-semibold text-rose-900">
+                                📌 The server is NOT down or refusing TCP traffic!
+                              </p>
+                              <p className="text-[11px] text-slate-600">
+                                The remote server <code>drive.jteras.com</code> is online and reachable. However, Nextcloud returned <strong>HTTP 401 Unauthorized</strong> because Nextcloud security policies disallow standard web login passwords on WebDAV endpoints.
+                              </p>
+                              <p className="text-[11px] text-slate-600">
+                                You must generate an <strong>App Password / Token</strong> in your Nextcloud account for <strong>zaidi.yasir</strong>:
+                              </p>
+                            </div>
+
+                            {/* Actionable Steps */}
+                            <div className="space-y-2 pt-1">
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                <a
+                                  href={`${ncServerUrl.replace(/\/+$/, '')}/index.php/settings/user/security#apppasswords`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center justify-center space-x-2 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition shadow-xs"
+                                >
+                                  <span>Generate App Password on drive.jteras.com</span>
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={handleTestNcConnection}
+                                  className="inline-flex items-center justify-center space-x-1.5 px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition"
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+                                  <span>Re-Test Connection</span>
+                                </button>
+                              </div>
+
+                              <ol className="list-decimal list-inside text-[11px] text-slate-600 space-y-1 bg-white/50 p-2.5 rounded border border-rose-100/60 font-sans">
+                                <li>Click the button above to go to <strong>Settings &gt; Security</strong> on Nextcloud.</li>
+                                <li>Scroll down to <strong>Devices &amp; sessions</strong> (<em>Peranti &amp; sesi</em>).</li>
+                                <li>In the <strong>App name</strong> field, enter <code>HMGeomatics ERP</code> and click <strong>Create new app password</strong>.</li>
+                                <li>Copy the generated token and paste it into the <strong>WebDAV App Token / Password</strong> field above.</li>
+                                <li>Click <strong>Test Connection</strong> to confirm the green verified badge, then click <strong>Save Configuration</strong>.</li>
+                              </ol>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

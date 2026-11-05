@@ -603,32 +603,43 @@ async function startServer() {
         return res.json({ 
           success: true, 
           status: response.status,
+          serverReachable: true,
           message: `Verified WebDAV connection to ${baseUrl.replace(/^https?:\/\//, '')}`
         });
       } else if (response.status === 401 || response.status === 403) {
-        return res.status(401).json({ 
+        return res.status(200).json({ 
           success: false, 
           status: response.status,
-          error: 'Authentication failed: Invalid username or App Password / Token. Please check your Nextcloud credentials.' 
+          serverReachable: true,
+          errorType: 'AUTH_FAILED',
+          securityUrl: `${baseUrl}/index.php/settings/user/security`,
+          error: 'Authentication failed (HTTP 401): Nextcloud requires a dedicated App Password / Token. Master login passwords cannot authenticate WebDAV.' 
         });
       } else if (response.status === 404) {
-        return res.status(404).json({
-          success: false,
-          status: response.status,
-          error: `Nextcloud user directory not found at ${davUrl}. Please check the server URL and username.`
-        });
-      } else {
-        return res.status(response.status).json({ 
+        return res.status(200).json({
           success: false, 
           status: response.status,
+          serverReachable: true,
+          errorType: 'NOT_FOUND',
+          error: `Nextcloud user directory not found at ${davUrl}. Please check the username '${username.trim()}'.`
+        });
+      } else {
+        return res.status(200).json({ 
+          success: false, 
+          status: response.status,
+          serverReachable: true,
+          errorType: 'HTTP_ERROR',
           error: `Nextcloud returned HTTP status ${response.status} (${response.statusText || 'Error'})` 
         });
       }
     } catch (err: any) {
       console.error('Nextcloud connection test error:', err);
       const isAbort = err.name === 'AbortError';
-      return res.status(500).json({ 
+      return res.status(200).json({ 
         success: false, 
+        status: 0,
+        serverReachable: false,
+        errorType: 'NETWORK_ERROR',
         error: isAbort ? 'Connection timed out after 10 seconds. Check server URL and network connectivity.' : (err.message || 'Unable to establish network connection to host.')
       });
     }
