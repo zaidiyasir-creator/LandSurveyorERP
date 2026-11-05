@@ -251,7 +251,7 @@ export default function App() {
         'Finance': false,
         'DocMgmt': false,
         'Reports': false,
-        'Exports': false,
+        'Exports': true,
       };
     } catch {
       return {
@@ -259,7 +259,7 @@ export default function App() {
         'Finance': false,
         'DocMgmt': false,
         'Reports': false,
-        'Exports': false,
+        'Exports': true,
       };
     }
   });
@@ -1701,8 +1701,8 @@ export default function App() {
                         const hasPerm = isPermitted(item.roles);
                         const isFeatureHidden = (group.title === 'UTAMA' && (isUtamaHidden || hiddenUtamaFeatures[item.name])) || (group.title === 'SOKONGAN' && hiddenSupportFeatures[item.name]);
 
-                        // Hide completely for non-admin users
-                        if (isFeatureHidden && userRole !== 'Management') return null;
+                        // Hide completely if feature is hidden
+                        if (isFeatureHidden) return null;
 
                         return (
                           <button
@@ -1785,8 +1785,8 @@ export default function App() {
                       const hasPerm = isPermitted(item.roles);
                       const isFeatureHidden = (group.title === 'UTAMA' && (isUtamaHidden || hiddenUtamaFeatures[item.name])) || (group.title === 'SOKONGAN' && hiddenSupportFeatures[item.name]);
 
-                      // Hide completely for non-admin users
-                      if (isFeatureHidden && userRole !== 'Management') return null;
+                      // Hide completely if feature is hidden
+                      if (isFeatureHidden) return null;
 
                       return (
                         <button
