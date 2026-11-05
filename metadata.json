@@ -1,5 +1,5 @@
 {
-  "name": "HMGeomatics ERP",
+  "name": "HMGeomatics ERP Portal",
   "description": "Enterprise Resource Planning (ERP) system for HMGeomatics Sdn BHD, a licensed land surveying company in Negeri Sembilan, Malaysia.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
