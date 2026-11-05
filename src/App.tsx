@@ -61,7 +61,10 @@ import {
   GripVertical,
   Upload,
   Image as ImageIcon,
-  RotateCcw
+  RotateCcw,
+  Sliders,
+  Shield,
+  UserCheck
 } from 'lucide-react';
 
 import { Client, Project, Submission, Equipment, Payroll, BoundaryDispute, LicensedSurveyor, Quotation, Leave, Attendance, RateSheet, JobSchedule } from './types';
@@ -130,7 +133,7 @@ import DocMgmtBoard from './components/DocMgmtBoard';
 import { JobSchedulingBoard } from './components/JobSchedulingBoard';
 
 type ActiveTab = 'Dashboard' | 'Clients' | 'Projects' | 'Submissions' | 'Equipment' | 'Payroll' | 'Disputes' | 'Surveyors' | 'Exports' | 'Quotations' | 'Scheduling' | 'CRM' | 'Finance' | 'DocMgmt' | 'Reports' | 'Settings';
-type UserRole = 'Management' | 'HR Management' | 'Employee' | 'Project Manager' | 'Technical';
+export type UserRole = 'System Admin' | 'Management' | 'HR Management' | 'Employee' | 'Project Manager' | 'Technical';
 
 export interface UserAccount {
   id: string;
@@ -140,6 +143,36 @@ export interface UserAccount {
   isCustom: boolean;
 }
 
+export const DEFAULT_USER_ACCOUNTS: UserAccount[] = [
+  { id: 'sa-0', name: 'Super System Administrator', role: 'System Admin', passwordHash: 'sysadmin123', isCustom: false },
+  { id: '1', name: 'Management Admin', role: 'Management', passwordHash: 'admin123', isCustom: false },
+  { id: '2', name: 'HR Manager', role: 'HR Management', passwordHash: 'hr123', isCustom: false },
+  { id: '3', name: 'Project Manager Admin', role: 'Project Manager', passwordHash: 'pm123', isCustom: false },
+  { id: '4', name: 'Technical Lead', role: 'Technical', passwordHash: 'tech123', isCustom: false },
+  { id: '5', name: 'Irwan Shah bin Ramli', role: 'Employee', passwordHash: 'employee123', isCustom: false },
+  { id: '6', name: 'Amirul bin Zainuddin', role: 'Employee', passwordHash: 'employee123', isCustom: false },
+  { id: '7', name: 'Faridah binti Abdul Rahman', role: 'Employee', passwordHash: 'employee123', isCustom: false },
+];
+
+export const DEFAULT_FUNCTION_PERMISSIONS: Record<ActiveTab, UserRole[]> = {
+  Dashboard: ['System Admin', 'Management', 'HR Management', 'Project Manager', 'Technical', 'Employee'],
+  Projects: ['System Admin', 'Management', 'Project Manager', 'Technical'],
+  Clients: ['System Admin', 'Management', 'HR Management', 'Project Manager'],
+  CRM: ['System Admin', 'Management', 'HR Management', 'Project Manager', 'Technical', 'Employee'],
+  Quotations: ['System Admin', 'Management', 'Project Manager'],
+  Scheduling: ['System Admin', 'Management', 'Project Manager', 'Technical'],
+  Submissions: ['System Admin', 'Management', 'Project Manager'],
+  Disputes: ['System Admin', 'Management', 'Technical'],
+  Equipment: ['System Admin', 'Management', 'Technical'],
+  Surveyors: ['System Admin', 'Management', 'HR Management', 'Project Manager'],
+  Payroll: ['System Admin', 'Management', 'HR Management', 'Employee'],
+  Finance: ['System Admin', 'Management', 'HR Management', 'Project Manager', 'Technical', 'Employee'],
+  DocMgmt: ['System Admin', 'Management', 'HR Management', 'Project Manager', 'Technical', 'Employee'],
+  Reports: ['System Admin', 'Management', 'HR Management', 'Project Manager', 'Technical', 'Employee'],
+  Exports: ['System Admin', 'Management'],
+  Settings: ['System Admin', 'Management', 'HR Management', 'Project Manager', 'Technical', 'Employee'],
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('Dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -148,17 +181,17 @@ export default function App() {
   const [userAccounts, setUserAccounts] = useState<UserAccount[]>(() => {
     try {
       const saved = localStorage.getItem('hmgeomatics_user_accounts');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: UserAccount[] = JSON.parse(saved);
+        if (!parsed.some(acc => acc.role === 'System Admin')) {
+          const merged = [DEFAULT_USER_ACCOUNTS[0], ...parsed];
+          localStorage.setItem('hmgeomatics_user_accounts', JSON.stringify(merged));
+          return merged;
+        }
+        return parsed;
+      }
     } catch {}
-    return [
-      { id: '1', name: 'Management Admin', role: 'Management', passwordHash: 'admin123', isCustom: false },
-      { id: '2', name: 'HR Manager', role: 'HR Management', passwordHash: 'hr123', isCustom: false },
-      { id: '3', name: 'Project Manager Admin', role: 'Project Manager', passwordHash: 'pm123', isCustom: false },
-      { id: '4', name: 'Technical Lead', role: 'Technical', passwordHash: 'tech123', isCustom: false },
-      { id: '5', name: 'Irwan Shah bin Ramli', role: 'Employee', passwordHash: 'employee123', isCustom: false },
-      { id: '6', name: 'Amirul bin Zainuddin', role: 'Employee', passwordHash: 'employee123', isCustom: false },
-      { id: '7', name: 'Faridah binti Abdul Rahman', role: 'Employee', passwordHash: 'employee123', isCustom: false },
-    ];
+    return DEFAULT_USER_ACCOUNTS;
   });
 
   const [loggedInAccountId, setLoggedInAccountId] = useState<string | null>(() => {
@@ -217,22 +250,36 @@ export default function App() {
   const [hiddenProfiles, setHiddenProfiles] = useState<Record<UserRole, boolean>>(() => {
     try {
       const saved = localStorage.getItem('hmgeomatics_hidden_profiles');
-      return saved ? JSON.parse(saved) : {
-        'Management': false,
-        'HR Management': false,
-        'Project Manager': false,
-        'Technical': false,
-        'Employee': false,
-      };
-    } catch {
-      return {
-        'Management': false,
-        'HR Management': false,
-        'Project Manager': false,
-        'Technical': false,
-        'Employee': false,
-      };
-    }
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          'System Admin': false,
+          'Management': false,
+          'HR Management': false,
+          'Project Manager': false,
+          'Technical': false,
+          'Employee': false,
+          ...parsed,
+        };
+      }
+    } catch {}
+    return {
+      'System Admin': false,
+      'Management': false,
+      'HR Management': false,
+      'Project Manager': false,
+      'Technical': false,
+      'Employee': false,
+    };
+  });
+
+  // Role & Function Access Permissions Matrix state
+  const [functionPermissions, setFunctionPermissions] = useState<Record<ActiveTab, UserRole[]>>(() => {
+    try {
+      const saved = localStorage.getItem('hmgeomatics_function_permissions');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return DEFAULT_FUNCTION_PERMISSIONS;
   });
 
   const toggleProfileVisibility = (role: UserRole) => {
@@ -457,7 +504,9 @@ export default function App() {
   const [isCustomizingDashboard, setIsCustomizingDashboard] = useState(false);
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
 
-  const isDashboardEditable = userRole === 'Management';
+  const isSystemAdmin = userRole === 'System Admin' || userRole === 'Management';
+  const isSuperAdmin = userRole === 'System Admin';
+  const isDashboardEditable = isSystemAdmin;
   const isCustomizing = isCustomizingDashboard && isDashboardEditable;
 
   const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>(() => {
@@ -660,6 +709,76 @@ export default function App() {
     setUserAccounts(updated);
     localStorage.setItem('hmgeomatics_user_accounts', JSON.stringify(updated));
     notify('success', `User account for "${name}" (${role}) successfully created.`);
+  };
+
+  // User Account Edit Modal/Inline State
+  const [editingUserAccount, setEditingUserAccount] = useState<UserAccount | null>(null);
+
+  const handleUpdateUserAccount = (accountId: string, updatedName: string, updatedRole: UserRole, updatedPassword?: string) => {
+    if (!updatedName.trim()) {
+      notify('error', 'User Name cannot be empty.');
+      return;
+    }
+    const updated = userAccounts.map(acc => {
+      if (acc.id === accountId) {
+        return {
+          ...acc,
+          name: updatedName.trim(),
+          role: updatedRole,
+          passwordHash: updatedPassword && updatedPassword.trim() ? updatedPassword.trim() : acc.passwordHash,
+        };
+      }
+      return acc;
+    });
+    setUserAccounts(updated);
+    localStorage.setItem('hmgeomatics_user_accounts', JSON.stringify(updated));
+
+    // If editing currently logged in user, update session role & name in sync
+    if (accountId === loggedInAccountId) {
+      setUserRole(updatedRole);
+      localStorage.setItem('hmgeomatics_role', updatedRole);
+      if (updatedRole === 'Employee') {
+        setLoggedInEmployee(updatedName.trim());
+        localStorage.setItem('hmgeomatics_employee', updatedName.trim());
+      }
+    }
+    setEditingUserAccount(null);
+    notify('success', `User account "${updatedName}" (${updatedRole}) updated successfully.`);
+  };
+
+  const toggleFunctionRolePermission = (tab: ActiveTab, role: UserRole) => {
+    if (role === 'System Admin') {
+      notify('error', 'System Admin always retains full unrestricted access to all functions.');
+      return;
+    }
+    const currentRoles = functionPermissions[tab] || [];
+    const updatedRoles = currentRoles.includes(role)
+      ? currentRoles.filter(r => r !== role)
+      : [...currentRoles, role];
+    const updated = {
+      ...functionPermissions,
+      [tab]: updatedRoles,
+    };
+    setFunctionPermissions(updated);
+    localStorage.setItem('hmgeomatics_function_permissions', JSON.stringify(updated));
+    notify('success', `Updated access permission for role "${role}" on function "${tab}".`);
+  };
+
+  const handleGrantAllPermissions = () => {
+    const allRoles: UserRole[] = ['System Admin', 'Management', 'HR Management', 'Project Manager', 'Technical', 'Employee'];
+    const updated: Record<ActiveTab, UserRole[]> = {} as any;
+    (Object.keys(DEFAULT_FUNCTION_PERMISSIONS) as ActiveTab[]).forEach(tab => {
+      updated[tab] = [...allRoles];
+    });
+    setFunctionPermissions(updated);
+    localStorage.setItem('hmgeomatics_function_permissions', JSON.stringify(updated));
+    notify('success', 'Full access granted to all user roles across all ERP functions.');
+  };
+
+  const handleResetFunctionPermissions = () => {
+    setFunctionPermissions(DEFAULT_FUNCTION_PERMISSIONS);
+    localStorage.setItem('hmgeomatics_function_permissions', JSON.stringify(DEFAULT_FUNCTION_PERMISSIONS));
+    notify('success', 'Function & Role Access Permissions restored to standard defaults.');
   };
 
   const handleResetUserPassword = (accountId: string, newPasswordHash: string) => {
@@ -1482,12 +1601,12 @@ export default function App() {
                   <button 
                     id="btn-show-override-login"
                     onClick={() => {
-                      setSelectedLoginRole('Management');
+                      setSelectedLoginRole('System Admin');
                       setIsLoginUserMode(false);
-                      setLoginPassword('admin123');
+                      setLoginPassword('sysadmin123');
                       setLoginError(null);
                     }}
-                    className="text-[10px] text-teal-500 hover:underline cursor-pointer"
+                    className="text-[10px] text-emerald-400 hover:underline cursor-pointer"
                   >
                     Admin Override Login
                   </button>
@@ -1499,23 +1618,26 @@ export default function App() {
                 <button
                   id="login-btn-system-administrator"
                   onClick={() => {
-                    setSelectedLoginRole('Management');
+                    setSelectedLoginRole('System Admin');
                     setIsLoginUserMode(false);
                     setLoginError(null);
                   }}
-                  className="flex flex-col justify-between p-6 border rounded-xl text-left transition duration-200 cursor-pointer focus:outline-none hover:scale-[1.02] border-teal-500 hover:bg-teal-950/20 text-teal-300 bg-teal-950/5 min-h-[180px]"
+                  className="flex flex-col justify-between p-6 border rounded-xl text-left transition duration-200 cursor-pointer focus:outline-none hover:scale-[1.02] border-emerald-500 hover:bg-emerald-950/20 text-emerald-300 bg-emerald-950/5 min-h-[180px]"
                 >
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                      Full Access
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-200 border border-emerald-500/30 font-mono">
+                      Super Admin Access
                     </span>
-                    <h3 className="font-bold text-base mt-4 text-white">System Administrator</h3>
+                    <h3 className="font-bold text-base mt-4 text-white flex items-center space-x-1.5">
+                      <Shield className="w-4 h-4 text-emerald-400" />
+                      <span>System Administrator</span>
+                    </h3>
                     <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                      Full administrative access to all systems, finance, disputes, and compliance settings.
+                      Master control to edit all settings, assign & edit user roles, and customize function permissions.
                     </p>
                   </div>
-                  <div className="mt-4 flex items-center text-xs font-semibold text-teal-400">
-                    <span>Select</span>
+                  <div className="mt-4 flex items-center text-xs font-semibold text-emerald-400">
+                    <span>Select System Admin</span>
                     <ChevronRight className="w-3.5 h-3.5 ml-1" />
                   </div>
                 </button>
@@ -1524,8 +1646,8 @@ export default function App() {
                 <button
                   id="login-btn-user-access"
                   onClick={() => {
-                    const defaultUserRole = (['HR Management', 'Project Manager', 'Technical', 'Employee'] as UserRole[])
-                      .find(r => !hiddenProfiles[r]) || 'HR Management';
+                    const defaultUserRole = (['Management', 'HR Management', 'Project Manager', 'Technical', 'Employee'] as UserRole[])
+                      .find(r => !hiddenProfiles[r]) || 'Management';
                     setSelectedLoginRole(defaultUserRole);
                     setIsLoginUserMode(true);
                     setLoginError(null);
@@ -1536,13 +1658,13 @@ export default function App() {
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300">
                       User Portal
                     </span>
-                    <h3 className="font-bold text-base mt-4 text-white">User</h3>
+                    <h3 className="font-bold text-base mt-4 text-white">Management & Operational Users</h3>
                     <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                      Access secure operations including HR, projects, fieldwork technicals, and employee self-service.
+                      Access operations including Management, HR, project planning, fieldwork technicals, and self-service.
                     </p>
                   </div>
                   <div className="mt-4 flex items-center text-xs font-semibold text-blue-400">
-                    <span>Select</span>
+                    <span>Select Role</span>
                     <ChevronRight className="w-3.5 h-3.5 ml-1" />
                   </div>
                 </button>
@@ -1579,16 +1701,20 @@ export default function App() {
                       }}
                       className="w-full text-sm p-2.5 bg-slate-900 border border-slate-800 rounded-lg text-white outline-none focus:border-teal-500 cursor-pointer"
                     >
-                      {!hiddenProfiles['HR Management'] && <option value="HR Management">HR</option>}
-                      {!hiddenProfiles['Project Manager'] && <option value="Project Manager">Project</option>}
-                      {!hiddenProfiles['Technical'] && <option value="Technical">Technical</option>}
-                      {!hiddenProfiles['Employee'] && <option value="Employee">Employee</option>}
+                      {!hiddenProfiles['Management'] && <option value="Management">Management (Director / Admin)</option>}
+                      {!hiddenProfiles['HR Management'] && <option value="HR Management">HR Management</option>}
+                      {!hiddenProfiles['Project Manager'] && <option value="Project Manager">Project Manager</option>}
+                      {!hiddenProfiles['Technical'] && <option value="Technical">Technical / Field</option>}
+                      {!hiddenProfiles['Employee'] && <option value="Employee">Employee (Self-Service)</option>}
                     </select>
                   ) : (
                     <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-sm font-bold text-white flex justify-between items-center">
-                      <span>Full Access = System Administrator</span>
-                      <span className="text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/20 px-2 py-0.5 rounded">
-                        Authorized
+                      <div className="flex items-center space-x-2">
+                        <Shield className="w-4 h-4 text-emerald-400" />
+                        <span>System Administrator (Super Admin)</span>
+                      </div>
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-bold">
+                        Master Auth
                       </span>
                     </div>
                   )}
@@ -1695,7 +1821,11 @@ export default function App() {
     }
   ];
 
-  const isPermitted = (roles?: string[]) => {
+  const isPermitted = (roles?: string[], tabName?: ActiveTab) => {
+    if (userRole === 'System Admin') return true;
+    if (tabName && functionPermissions[tabName]) {
+      return functionPermissions[tabName].includes(userRole as UserRole);
+    }
     if (!roles) return true;
     return roles.includes(userRole as any);
   };
@@ -1743,7 +1873,7 @@ export default function App() {
             <div className="flex-1 overflow-y-auto pr-1">
               {sidebarGroups.map((group) => {
                 const isGroupHidden = group.title === 'UTAMA' && isUtamaHidden;
-                if (isGroupHidden && userRole !== 'Management') return null;
+                if (isGroupHidden && !isSystemAdmin) return null;
 
                 return (
                   <div key={group.title} className={`mb-4 ${isGroupHidden ? 'border border-dashed border-rose-500/30 rounded p-1.5 bg-rose-950/20' : ''}`}>
@@ -1759,7 +1889,7 @@ export default function App() {
                       {group.items.map((item) => {
                         const Icon = item.icon;
                         const isSelected = activeTab === item.name;
-                        const hasPerm = isPermitted(item.roles);
+                        const hasPerm = isPermitted(item.roles, item.name);
                         const isFeatureHidden = (group.title === 'UTAMA' && (isUtamaHidden || hiddenUtamaFeatures[item.name])) || (group.title === 'SOKONGAN' && hiddenSupportFeatures[item.name]);
 
                         // Hide completely if feature is hidden
@@ -1827,7 +1957,7 @@ export default function App() {
           <div className="px-3 space-y-6 overflow-y-auto max-h-[calc(100vh-140px)] pr-2 scrollbar-none">
             {sidebarGroups.map((group) => {
               const isGroupHidden = group.title === 'UTAMA' && isUtamaHidden;
-              if (isGroupHidden && userRole !== 'Management') return null;
+              if (isGroupHidden && !isSystemAdmin) return null;
 
               return (
                 <div key={group.title} className={`space-y-1.5 ${isGroupHidden ? 'border border-dashed border-rose-500/30 rounded p-1.5 bg-rose-950/20' : ''}`}>
@@ -1843,7 +1973,7 @@ export default function App() {
                     {group.items.map((item) => {
                       const Icon = item.icon;
                       const isSelected = activeTab === item.name;
-                      const hasPerm = isPermitted(item.roles);
+                      const hasPerm = isPermitted(item.roles, item.name);
                       const isFeatureHidden = (group.title === 'UTAMA' && (isUtamaHidden || hiddenUtamaFeatures[item.name])) || (group.title === 'SOKONGAN' && hiddenSupportFeatures[item.name]);
 
                       // Hide completely if feature is hidden
@@ -1991,7 +2121,7 @@ export default function App() {
             <p className="text-slate-600 font-semibold text-sm">Synchronizing with HMGeomatics databases...</p>
             <p className="text-slate-400 text-xs mt-1">Acquiring boundary coordinates & compliance certificates</p>
           </div>
-        ) : !isPermitted(sidebarGroups.flatMap(g => g.items).find(i => i.name === activeTab)?.roles) ? (
+        ) : !isPermitted(sidebarGroups.flatMap(g => g.items).find(i => i.name === activeTab)?.roles, activeTab) ? (
           /* SECURITY PADLOCK RESTRICTED COMPLIANCE SCREEN */
           <div className="bg-white border border-slate-200 rounded-2xl p-8 py-12 shadow-sm text-center max-w-xl mx-auto my-12 space-y-4 animate-fadeIn">
             <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto border border-red-100">
@@ -4928,6 +5058,7 @@ export default function App() {
                         <div>
                           <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider font-mono">Access Permissions</span>
                           <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                            {userRole === 'System Admin' && 'Full unrestricted master access: edit all system settings, user roles, security credentials, and module function permissions.'}
                             {userRole === 'Management' && 'Full system read/write, financial audits, payroll releases, and proposal signature authority.'}
                             {userRole === 'Project Manager' && 'Project directory writes, client registers, client CRM, JUPEM submission tracking, and scheduling.'}
                             {userRole === 'HR Management' && 'Employee directories, payroll schedules, and accredited land surveyor registries.'}
@@ -5158,11 +5289,160 @@ export default function App() {
                   </div>
 
                   {/* SYSTEM ADMIN MANAGEMENT CONTROLS */}
-                  {userRole === 'Management' && (
+                  {isSystemAdmin && (
                     <div className="space-y-6 pt-6 border-t border-slate-200 mt-6">
-                      <div className="border-b border-slate-200 pb-3">
-                        <h3 className="text-lg font-bold text-slate-900">System Admin Control Center</h3>
-                        <p className="text-xs text-slate-500">Configure profile visibility, pricing rate sheets, user registration, and reset credentials.</p>
+                      <div className="border-b border-slate-200 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h3 className="text-lg font-bold text-slate-900">System Admin Control Center</h3>
+                            <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                              {userRole === 'System Admin' ? 'Super Administrator Access' : 'Management Administrative Access'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500">Edit all system settings, user roles & accounts, and role-to-function access permissions.</p>
+                        </div>
+                      </div>
+
+                      {/* 1. ROLE & FUNCTION ACCESS PERMISSIONS MATRIX */}
+                      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 mb-5 gap-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+                              <Sliders className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <h4 className="font-bold text-sm tracking-tight text-slate-900 font-sans">
+                                  System Admin: Role & Function Access Permissions Matrix
+                                </h4>
+                                <span className="text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                  Live Policy Engine
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 font-sans mt-0.5">
+                                Configure which professional roles have access to each ERP system module and navigation tab. Click checkboxes to grant or revoke instantly.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={handleGrantAllPermissions}
+                              className="px-3 py-1.5 text-xs font-semibold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition cursor-pointer font-sans"
+                              title="Grant all roles access to all modules"
+                            >
+                              Grant All Roles
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleResetFunctionPermissions}
+                              className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition cursor-pointer font-sans"
+                              title="Restore standard system access matrix"
+                            >
+                              Restore Defaults
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* MATRIX TABLE */}
+                        <div className="overflow-x-auto border border-slate-150 rounded-xl">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-slate-50 border-b border-slate-150 text-[10px] uppercase text-slate-600 font-mono">
+                              <tr>
+                                <th className="p-3 font-bold">Function / Module</th>
+                                <th className="p-3 text-center font-bold text-emerald-700">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <Shield className="w-3 h-3 text-emerald-600" />
+                                    <span>System Admin</span>
+                                  </div>
+                                </th>
+                                <th className="p-3 text-center font-bold text-teal-700">Management</th>
+                                <th className="p-3 text-center font-bold text-purple-700">HR Mgmt</th>
+                                <th className="p-3 text-center font-bold text-blue-700">Project Mgr</th>
+                                <th className="p-3 text-center font-bold text-amber-700">Technical</th>
+                                <th className="p-3 text-center font-bold text-slate-700">Employee</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {[
+                                // UTAMA
+                                { key: 'Dashboard' as ActiveTab, label: 'Dashboard Control Center', group: 'UTAMA', desc: 'KPI summaries, financial widgets, and operational activity' },
+                                { key: 'Projects' as ActiveTab, label: 'Survey Projects Directory', group: 'UTAMA', desc: 'Registered cadastral jobs, land titles, and lot plans' },
+                                { key: 'Clients' as ActiveTab, label: 'Clients & Land Owners', group: 'UTAMA', desc: 'Client directory, cadastral contacts, and communication records' },
+                                { key: 'CRM' as ActiveTab, label: 'CRM & Client Marketing', group: 'UTAMA', desc: 'Client follow-ups, proposal conversion, and inquiries' },
+                                // OPERASI
+                                { key: 'Quotations' as ActiveTab, label: 'Quotation & Fee Proposals', group: 'OPERASI', desc: 'Survey fee calculations, formal quote generation, and approvals' },
+                                { key: 'Scheduling' as ActiveTab, label: 'Fieldwork Job Scheduling', group: 'OPERASI', desc: 'Team assignments, equipment booking, and calendar scheduling' },
+                                { key: 'Submissions' as ActiveTab, label: 'JUPEM Statutory Submissions', group: 'OPERASI', desc: 'Title survey submissions, JUPEM status, and certified plans' },
+                                { key: 'Disputes' as ActiveTab, label: 'Boundary Disputes & Tribunals', group: 'OPERASI', desc: 'Land boundary disputes, evidence archive, and tribunal filings' },
+                                { key: 'Equipment' as ActiveTab, label: 'Equipment & Calibration', group: 'OPERASI', desc: 'GNSS receivers, Total Stations, and calibration logs' },
+                                { key: 'Surveyors' as ActiveTab, label: 'Licensed Land Surveyors', group: 'OPERASI', desc: 'LJT accredited surveyor registrations and compliance records' },
+                                // SOKONGAN
+                                { key: 'Payroll' as ActiveTab, label: 'HR Management & Payroll', group: 'SOKONGAN', desc: 'Staff compensation, EPF/SOCSO, leave approvals, and attendance' },
+                                { key: 'Finance' as ActiveTab, label: 'Finance & Ledger Records', group: 'SOKONGAN', desc: 'Company revenue, accounts receivables, and financial records' },
+                                { key: 'DocMgmt' as ActiveTab, label: 'Document Cloud Management', group: 'SOKONGAN', desc: 'Nextcloud WebDAV plans, Paperless-ngx, and transmittals' },
+                                { key: 'Reports' as ActiveTab, label: 'Analytics & Compliance Reports', group: 'SOKONGAN', desc: 'Statutory compliance telemetry and performance metrics' },
+                                { key: 'Exports' as ActiveTab, label: 'Technical Codes & Specs', group: 'SOKONGAN', desc: 'Surveyor laws, LJT code manuals, and JUPEM technical specs' },
+                                { key: 'Settings' as ActiveTab, label: 'System Settings & Security', group: 'SOKONGAN', desc: 'Global settings, branding, Nextcloud WebDAV, and security' },
+                              ].map((fn) => {
+                                const allowedRoles = functionPermissions[fn.key] || [];
+                                return (
+                                  <tr key={fn.key} className="hover:bg-slate-50/70 transition">
+                                    <td className="p-3">
+                                      <div className="flex items-center space-x-2">
+                                        <span className="font-bold text-slate-900 text-xs">{fn.label}</span>
+                                        <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold uppercase ${
+                                          fn.group === 'UTAMA' ? 'bg-teal-50 text-teal-700 border border-teal-200' :
+                                          fn.group === 'OPERASI' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
+                                          'bg-slate-100 text-slate-600 border border-slate-200'
+                                        }`}>
+                                          {fn.group}
+                                        </span>
+                                      </div>
+                                      <span className="text-[10px] text-slate-400 block mt-0.5">{fn.desc}</span>
+                                    </td>
+
+                                    {/* System Admin Root Master Access (Locked) */}
+                                    <td className="p-3 text-center bg-emerald-50/30">
+                                      <div className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold" title="System Admin always has permanent access">
+                                        <Check className="w-4 h-4 text-emerald-700 stroke-[3]" />
+                                      </div>
+                                    </td>
+
+                                    {/* Management, HR Management, Project Manager, Technical, Employee */}
+                                    {(['Management', 'HR Management', 'Project Manager', 'Technical', 'Employee'] as UserRole[]).map((role) => {
+                                      const isAllowed = allowedRoles.includes(role);
+                                      return (
+                                        <td key={role} className="p-3 text-center">
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleFunctionRolePermission(fn.key, role)}
+                                            className={`w-7 h-7 rounded-md flex items-center justify-center transition cursor-pointer mx-auto ${
+                                              isAllowed
+                                                ? 'bg-teal-600 text-white shadow-xs hover:bg-teal-700'
+                                                : 'bg-slate-100 text-slate-300 hover:bg-slate-200 hover:text-slate-500 border border-slate-200'
+                                            }`}
+                                            title={`${isAllowed ? 'Revoke' : 'Grant'} access for ${role} on ${fn.label}`}
+                                          >
+                                            {isAllowed ? <Check className="w-4 h-4 stroke-[3]" /> : <X className="w-3.5 h-3.5 opacity-40" />}
+                                          </button>
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div className="mt-4 p-3 bg-slate-50 rounded-lg text-[11px] text-slate-500 flex items-start space-x-2">
+                          <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                          <span>
+                            Function & role access permissions are enforced immediately across the sidebar navigation and page routing. Revoking access from a role completely hides the menu item and restricts unauthorized URL access. System Administrator retains universal master oversight.
+                          </span>
+                        </div>
                       </div>
 
                       {/* RATE SHEETS CONFIGURATION PANEL */}
@@ -5490,11 +5770,12 @@ export default function App() {
                                 onChange={(e) => setAdminCreateRole(e.target.value as UserRole)}
                                 className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
                               >
-                                <option value="Employee">Employee (Self-Service Metrics)</option>
-                                <option value="Technical">Technical / Field (Calibration & Disputes)</option>
-                                <option value="Project Manager">Project Manager (Jobs & Clients)</option>
+                                <option value="System Admin">System Admin (Full Super Admin Access)</option>
+                                <option value="Management">Management (Director / Admin Access)</option>
                                 <option value="HR Management">HR Management (Personnel & Payroll)</option>
-                                <option value="Management">Management (Full Admin Access)</option>
+                                <option value="Project Manager">Project Manager (Jobs & Clients)</option>
+                                <option value="Technical">Technical / Field (Calibration & Disputes)</option>
+                                <option value="Employee">Employee (Self-Service Metrics)</option>
                               </select>
                             </div>
 
@@ -5541,9 +5822,15 @@ export default function App() {
                                 <tbody className="divide-y divide-slate-100 bg-white">
                                   {userAccounts.map((acc) => (
                                     <tr key={acc.id} className="hover:bg-slate-50/50">
-                                      <td className="p-3 font-semibold text-slate-900">{acc.name}</td>
+                                      <td className="p-3 font-semibold text-slate-900">
+                                        <div className="flex items-center space-x-1.5">
+                                          {acc.role === 'System Admin' && <Shield className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                                          <span>{acc.name}</span>
+                                        </div>
+                                      </td>
                                       <td className="p-3">
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                          acc.role === 'System Admin' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
                                           acc.role === 'Management' ? 'bg-teal-50 text-teal-700 border border-teal-100' :
                                           acc.role === 'HR Management' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
                                           acc.role === 'Project Manager' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
@@ -5597,7 +5884,17 @@ export default function App() {
                                         )}
                                       </td>
                                       <td className="p-3 text-right">
-                                        <div className="flex items-center justify-end space-x-2">
+                                        <div className="flex items-center justify-end space-x-1.5">
+                                          {/* EDIT USER BUTTON */}
+                                          <button
+                                            onClick={() => setEditingUserAccount(acc)}
+                                            className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-[10px] font-bold flex items-center space-x-1 border border-emerald-200 cursor-pointer"
+                                            title="Edit User Name, Role & Security Password"
+                                          >
+                                            <Edit2 className="w-3 h-3 text-emerald-600" />
+                                            <span>Edit Role</span>
+                                          </button>
+
                                           {resettingAccountId !== acc.id && (
                                             <button
                                               onClick={() => {
@@ -5608,7 +5905,7 @@ export default function App() {
                                               title="Reset Security Password"
                                             >
                                               <RefreshCw className="w-3 h-3" />
-                                              <span>Reset Password</span>
+                                              <span>Reset Pwd</span>
                                             </button>
                                           )}
                                           
@@ -5760,6 +6057,92 @@ export default function App() {
               >
                 Confirm Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ----------------- EDIT USER & ROLE MODAL ----------------- */}
+      {editingUserAccount && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-fadeIn text-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center">
+                  <UserCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 font-sans">Edit User Account & Role</h3>
+                  <p className="text-[11px] text-slate-500 font-sans">Modify profile permissions, security credentials, or assign System Admin.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingUserAccount(null)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-semibold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 font-sans">Full Name / Username *</label>
+                <input
+                  type="text"
+                  value={editingUserAccount.name}
+                  onChange={(e) => setEditingUserAccount({ ...editingUserAccount, name: e.target.value })}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans"
+                  placeholder="Enter user name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 font-sans">System Profile / Role *</label>
+                <select
+                  value={editingUserAccount.role}
+                  onChange={(e) => setEditingUserAccount({ ...editingUserAccount, role: e.target.value as UserRole })}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-sans cursor-pointer"
+                >
+                  <option value="System Admin">System Admin (Full Super Admin Access)</option>
+                  <option value="Management">Management (Director / Admin Access)</option>
+                  <option value="HR Management">HR Management (Personnel & Payroll)</option>
+                  <option value="Project Manager">Project Manager (Jobs & Clients)</option>
+                  <option value="Technical">Technical / Field (Calibration & Disputes)</option>
+                  <option value="Employee">Employee (Self-Service Metrics)</option>
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1 font-sans">
+                  System Admin grants full privileges across all settings, roles, and module function permissions.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 font-sans">Security Password *</label>
+                <input
+                  type="text"
+                  value={editingUserAccount.passwordHash}
+                  onChange={(e) => setEditingUserAccount({ ...editingUserAccount, passwordHash: e.target.value })}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-teal-500 font-mono"
+                  placeholder="Enter security password"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUserAccount(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition cursor-pointer font-sans"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdateUserAccount(editingUserAccount.id, editingUserAccount.name, editingUserAccount.role, editingUserAccount.passwordHash)}
+                  className="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition shadow-xs cursor-pointer flex items-center space-x-1.5 font-sans"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Save Changes</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

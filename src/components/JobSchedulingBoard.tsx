@@ -604,7 +604,7 @@ export const JobSchedulingBoard: React.FC<JobSchedulingBoardProps> = ({
             </select>
 
             {/* Book Button */}
-            {(userRole === 'Management' || userRole === 'Project Manager') && (
+            {(userRole === 'System Admin' || userRole === 'Management' || userRole === 'Project Manager') && (
               <button
                 onClick={() => handleOpenCreate()}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
@@ -1127,7 +1127,7 @@ export const JobSchedulingBoard: React.FC<JobSchedulingBoardProps> = ({
                   )}
 
                   {/* Action buttons */}
-                  {(userRole === 'Management' || userRole === 'Project Manager') && (
+                  {(userRole === 'System Admin' || userRole === 'Management' || userRole === 'Project Manager') && (
                     <div className="flex space-x-2 pt-2 border-t border-slate-100">
                       <button
                         onClick={() => handleOpenEdit(s)}
