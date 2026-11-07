@@ -2144,14 +2144,15 @@ export default function App() {
         {/* FLOATING NOTIFICATION BANNER */}
         {notification && (
           <div
-            className={`fixed bottom-5 right-5 z-50 flex items-center space-x-2 px-5 py-3 rounded-lg shadow-xl border text-sm transition-all duration-300 ${
+            id="app-notification-toast"
+            className={`fixed bottom-6 left-6 md:left-72 z-[9999] flex items-center space-x-2.5 px-5 py-3 rounded-lg shadow-2xl border text-sm transition-all duration-300 animate-fadeIn ${
               notification.type === 'success'
                 ? 'bg-slate-900 text-teal-300 border-teal-500'
                 : 'bg-red-950 text-red-200 border-red-500'
             }`}
           >
-            <span className="w-2 h-2 bg-current rounded-full animate-ping"></span>
-            <span>{notification.message}</span>
+            <span className="w-2 h-2 bg-current rounded-full animate-ping shrink-0"></span>
+            <span className="font-medium font-sans">{notification.message}</span>
           </div>
         )}
 
